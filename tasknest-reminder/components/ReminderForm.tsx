@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Save, Calendar, Clock, FolderOpen } from 'lucide-react';
+import { ArrowLeft, Save, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Category {
@@ -81,7 +81,7 @@ export default function ReminderForm() {
       });
 
       if (response.ok) {
-        const reminder = await response.json();
+        await response.json();
         toast.success('Reminder created successfully!');
         router.push('/dashboard');
       } else {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 
 // Validation schemas
 const createReminderSchema = z.object({
@@ -16,24 +17,20 @@ const createReminderSchema = z.object({
   notes: z.string().optional(),
 });
 
-const updateReminderSchema = createReminderSchema.partial();
-
 // Helper function to get user email from cookies
 async function getUserEmail(request: NextRequest) {
-  // Try to get from server-side cookies first
   const cookieStore = await cookies();
   let userEmail = cookieStore.get('userEmail')?.value;
 
-  // If not found in server-side cookies, try from request headers (client-side cookies)
   if (!userEmail) {
     const cookieHeader = request.headers.get('cookie');
     if (cookieHeader) {
-      const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
+      const parsed = cookieHeader.split(';').reduce((acc, cookie) => {
         const [key, value] = cookie.trim().split('=');
         acc[key] = value;
         return acc;
       }, {} as Record<string, string>);
-      userEmail = cookies['userEmail'];
+      userEmail = parsed['userEmail'];
     }
   }
 
@@ -50,15 +47,14 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status'); // 'all', 'upcoming', 'completed', 'overdue'
+    const status = searchParams.get('status');
     const categoryId = searchParams.get('categoryId');
     const priority = searchParams.get('priority');
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '10')));
     const skip = (page - 1) * limit;
 
-    // Get user
-    const user = await (prisma as any).user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { email: userEmail },
     });
 
@@ -66,8 +62,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Build where clause
-    const where: any = {
+    const where: Prisma.ReminderWhereInput = {
       userId: user.id,
     };
 
@@ -86,20 +81,17 @@ export async function GET(request: NextRequest) {
     }
 
     if (priority) {
-      where.priority = priority;
+      where.priority = priority as Prisma.EnumPriorityFilter;
     }
 
-    // Get reminders with pagination (simplified without includes)
     const [reminders, total] = await Promise.all([
-      (prisma as any).reminder.findMany({
+      prisma.reminder.findMany({
         where,
-        orderBy: [
-          { datetime: 'asc' },
-        ],
+        orderBy: { datetime: 'asc' },
         skip,
         take: limit,
       }),
-      (prisma as any).reminder.count({ where }),
+      prisma.reminder.count({ where }),
     ]);
 
     return NextResponse.json({
@@ -132,8 +124,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = createReminderSchema.parse(body);
 
-    // Get user
-    const user = await (prisma as any).user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { email: userEmail },
     });
 
@@ -143,7 +134,7 @@ export async function POST(request: NextRequest) {
 
     // Validate category if provided
     if (validatedData.categoryId) {
-      const category = await (prisma as any).category.findFirst({
+      const category = await prisma.category.findFirst({
         where: {
           id: validatedData.categoryId,
           userId: user.id,
@@ -158,22 +149,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create reminder (simplified data structure)
-    const reminderData = {
-      title: validatedData.title,
-      description: validatedData.description,
-      datetime: new Date(validatedData.datetime),
-      priority: validatedData.priority,
-      isRecurring: validatedData.isRecurring,
-      recurrence: validatedData.recurrence,
-      categoryId: validatedData.categoryId,
-      location: validatedData.location,
-      notes: validatedData.notes,
-      userId: user.id,
-    };
-
-    const reminder = await (prisma as any).reminder.create({
-      data: reminderData,
+    const reminder = await prisma.reminder.create({
+      data: {
+        title: validatedData.title,
+        description: validatedData.description,
+        datetime: new Date(validatedData.datetime),
+        priority: validatedData.priority,
+        isRecurring: validatedData.isRecurring,
+        recurrence: validatedData.recurrence,
+        categoryId: validatedData.categoryId,
+        location: validatedData.location,
+        notes: validatedData.notes,
+        userId: user.id,
+      },
     });
 
     return NextResponse.json(reminder, { status: 201 });
@@ -191,4 +179,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}

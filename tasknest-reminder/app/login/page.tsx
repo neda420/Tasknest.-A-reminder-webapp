@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,7 +9,6 @@ import { Bell, Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function LoginPage() {
-  const router = useRouter();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -34,18 +32,16 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (response.ok) {
-        console.log('Login: Success, redirecting to dashboard');
         toast.success('Login successful!');
-        // Small delay to ensure cookies are set
+        // Use role from API response to determine redirect
         setTimeout(() => {
-          if (formData.email.trim().toLowerCase() === 'admin@gmail.com') {
+          if (data.user?.role === 'ADMIN') {
             window.location.href = '/dashboard/admin';
           } else {
             window.location.href = '/dashboard';
           }
         }, 100);
       } else {
-        console.log('Login: Failed:', data.error);
         toast.error(data.error || 'Login failed');
       }
     } catch (error) {
@@ -138,7 +134,7 @@ export default function LoginPage() {
 
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">
-                Don't have an account?{' '}
+                Don&apos;t have an account?{' '}
                 <Link href="/register" className="text-blue-600 hover:text-blue-700 font-medium">
                   Sign up here
                 </Link>

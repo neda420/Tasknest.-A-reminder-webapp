@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma'; 
+import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: Request) {
   try {
@@ -12,24 +14,35 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
+    // Validate email format
+    if (!EMAIL_REGEX.test(email)) {
+      return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
+    }
+
+    // Validate password length
+    if (password.length < 6) {
+      return NextResponse.json({ error: 'Password must be at least 6 characters long' }, { status: 400 });
+    }
+
     // Check if user already exists
-    const existingUser = await (prisma as any).user.findUnique({
+    const existingUser = await prisma.user.findUnique({
       where: { email },
     });
 
     if (existingUser) {
-      return NextResponse.json({ error: 'User already exists' }, { status: 409 });
+      return NextResponse.json({ error: 'An account with this email already exists' }, { status: 409 });
     }
 
     // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create user
-    const newUser = await (prisma as any).user.create({
+    const newUser = await prisma.user.create({
       data: {
-        name,
-        email,
+        name: name.trim(),
+        email: email.toLowerCase().trim(),
         password: hashedPassword,
+        lastLogin: new Date(),
       },
     });
 
@@ -41,14 +54,14 @@ export async function POST(request: Request) {
 
     // Set cookies for authentication (non-httpOnly so client can access them)
     response.cookies.set('userEmail', newUser.email, {
-      httpOnly: false, // Allow client-side access
+      httpOnly: false,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7, // 7 days
     });
 
     response.cookies.set('userId', newUser.id.toString(), {
-      httpOnly: false, // Allow client-side access
+      httpOnly: false,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7, // 7 days
@@ -56,7 +69,7 @@ export async function POST(request: Request) {
 
     return response;
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[REGISTER_ERROR]', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }

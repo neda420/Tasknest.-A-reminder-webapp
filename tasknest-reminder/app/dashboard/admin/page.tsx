@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,12 +31,12 @@ interface Reminder {
 }
 
 export default function AdminPage() {
+  const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editUser, setEditUser] = useState<User | null>(null);
   const [addUserData, setAddUserData] = useState({ name: "", email: "", password: "", nickname: "" });
   const [editUserData, setEditUserData] = useState({ id: 0, name: "", email: "", nickname: "" });
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
@@ -45,9 +45,6 @@ export default function AdminPage() {
   const [userReminders, setUserReminders] = useState<Reminder[]>([]);
   const [showRemindersModal, setShowRemindersModal] = useState(false);
   const [remindersLoading, setRemindersLoading] = useState(false);
-  const router = useRouter();
-  const [debugCookie, setDebugCookie] = useState('');
-  const [debugUserEmail, setDebugUserEmail] = useState('');
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordUser, setPasswordUser] = useState<User | null>(null);
   const [newPassword, setNewPassword] = useState("");
@@ -64,22 +61,7 @@ export default function AdminPage() {
   const recentUsers = users.slice(0, 5);
 
   useEffect(() => {
-    // Debug: Show document.cookie and detected userEmail
-    setDebugCookie(document.cookie);
-    const getCookie = (name: string) => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop()?.split(';').shift();
-      return null;
-    };
-    const userEmail = decodeURIComponent(getCookie('userEmail') || '');
-    setDebugUserEmail(userEmail || '');
-
-    if (userEmail !== 'admin@gmail.com') {
-      setError('Access denied. Only admin can view this page.');
-      setLoading(false);
-      return;
-    }
+    // Let the API enforce admin access; redirect on 403
     fetchUsers();
   }, []);
 
@@ -87,10 +69,15 @@ export default function AdminPage() {
     setLoading(true);
     fetch("/api/admin/users", { credentials: "include" })
       .then((res) => {
+        if (res.status === 403 || res.status === 401) {
+          router.push('/dashboard');
+          return null;
+        }
         if (!res.ok) throw new Error("Failed to fetch users");
         return res.json();
       })
       .then((data) => {
+        if (!data) return;
         setUsers(data.users);
         setLoading(false);
       })
@@ -102,14 +89,13 @@ export default function AdminPage() {
 
   // Edit user
   const openEditModal = (user: User) => {
-    setEditUser(user);
     setEditUserData({ id: user.id, name: user.name, email: user.email, nickname: user.nickname || "" });
     setShowEditModal(true);
   };
   const handleEditChange = (field: string, value: string) => {
     setEditUserData((prev) => ({ ...prev, [field]: value }));
   };
-  const handleEditSubmit = async (e: any) => {
+  const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const res = await fetch("/api/admin/users", {
       method: "PUT",
@@ -134,7 +120,7 @@ export default function AdminPage() {
   const handleAddChange = (field: string, value: string) => {
     setAddUserData((prev) => ({ ...prev, [field]: value }));
   };
-  const handleAddSubmit = async (e: any) => {
+  const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const res = await fetch("/api/admin/users", {
       method: "POST",
@@ -170,9 +156,16 @@ export default function AdminPage() {
 
   // Logout
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    toast.success("Logged out");
-    router.push("/login");
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      document.cookie = 'userEmail=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      document.cookie = 'userId=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      toast.success("Logged out");
+      router.push("/login");
+    }
   };
 
   // Show reminders for a user
@@ -196,7 +189,7 @@ export default function AdminPage() {
     setNewPassword("");
     setShowPasswordModal(true);
   };
-  const handlePasswordReset = async (e: any) => {
+  const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!passwordUser) return;
     setResettingPassword(true);
@@ -268,11 +261,6 @@ export default function AdminPage() {
           </CardHeader>
           <CardContent>
             <p className="text-red-600">{error}</p>
-            <div className="mt-4 p-2 bg-gray-100 rounded text-xs text-gray-700">
-              <div><b>Debug:</b></div>
-              <div><b>document.cookie:</b> {debugCookie}</div>
-              <div><b>Detected userEmail:</b> {debugUserEmail}</div>
-            </div>
             <Button className="mt-4" onClick={() => router.push("/dashboard")}>Go to Dashboard</Button>
           </CardContent>
         </Card>
@@ -466,7 +454,7 @@ export default function AdminPage() {
         {showRemindersModal && selectedUser && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
             <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
-              <h2 className="text-xl font-bold mb-4">{selectedUser.name}'s Reminders</h2>
+              <h2 className="text-xl font-bold mb-4">{selectedUser.name}&apos;s Reminders</h2>
               {remindersLoading ? (
                 <div className="text-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>

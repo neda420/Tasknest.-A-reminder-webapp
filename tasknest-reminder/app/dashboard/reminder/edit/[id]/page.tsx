@@ -7,7 +7,6 @@ import { toast } from 'react-hot-toast';
 import { 
   ArrowLeft, 
   Calendar, 
-  Clock, 
   Save, 
   Trash2,
   Bell

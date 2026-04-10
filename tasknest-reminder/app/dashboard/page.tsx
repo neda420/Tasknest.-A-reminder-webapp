@@ -72,7 +72,6 @@ export default function DashboardPage() {
     overdue: 0,
     urgent: 0
   });
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [showCompleted, setShowCompleted] = useState(true);
@@ -140,8 +139,6 @@ export default function DashboardPage() {
 
   const loadDashboardData = async () => {
     try {
-      setLoading(true);
-      
       // Load profile data first (fastest)
       const profileResponse = await fetch('/api/user/profile');
       if (profileResponse.ok) {
@@ -172,24 +169,22 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleLogout = async () => {
     try {
-      const response = await fetch('/api/auth/logout', {
+      await fetch('/api/auth/logout', {
         method: 'POST',
       });
-      
-      if (response.ok) {
-        toast.success('Logged out successfully');
-        router.push('/login');
-      }
     } catch (error) {
       console.error('Logout error:', error);
-      toast.error('Error during logout');
+    } finally {
+      // Clear cookies client-side as well
+      document.cookie = 'userEmail=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      document.cookie = 'userId=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      toast.success('Logged out successfully');
+      router.push('/login');
     }
   };
 
@@ -332,11 +327,6 @@ export default function DashboardPage() {
       console.error('Error adding quick category:', error);
       toast.error('Error adding category');
     }
-  };
-
-  // Function to refresh dashboard data (can be called from other components)
-  const refreshDashboardData = async () => {
-    await loadDashboardData();
   };
 
   // Function to refresh profile data specifically (only when needed)
@@ -667,7 +657,7 @@ export default function DashboardPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Today's Schedule</CardTitle>
+              <CardTitle>Today&apos;s Schedule</CardTitle>
               <CardDescription>Your reminders for today</CardDescription>
             </CardHeader>
             <CardContent>
