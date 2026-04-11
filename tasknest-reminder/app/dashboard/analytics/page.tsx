@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, BarChart3, Clock, CheckCircle, AlertTriangle, TrendingUp, Target, Plus } from 'lucide-react';
+import * as db from '@/lib/store';
 
 interface Reminder {
   id: number;
@@ -42,142 +43,18 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get user email from cookies
-    const getCookie = (name: string) => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop()?.split(';').shift();
-      return null;
-    };
-    
-    const email = getCookie('userEmail');
-    if (email) {
-      loadAnalytics();
-    } else {
-      router.push('/login');
-    }
+    loadAnalytics();
   }, [router]);
 
-  const loadAnalytics = async () => {
-    try {
-      // Fetch real data from API
-      const response = await fetch('/api/reminders');
-      if (response.ok) {
-        const data = await response.json();
-        const reminders = data.reminders || [];
-        calculateAnalytics(reminders);
-      } else {
-        // Fallback to mock data if API fails
-        console.log('API failed, using mock data');
-        const mockReminders: Reminder[] = [
-          {
-            id: 1,
-            title: 'Team Meeting',
-            description: 'Weekly team sync',
-            datetime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-            priority: 'HIGH',
-            isCompleted: false
-          },
-          {
-            id: 2,
-            title: 'Doctor Appointment',
-            description: 'Annual checkup',
-            datetime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-            priority: 'MEDIUM',
-            isCompleted: false
-          },
-          {
-            id: 3,
-            title: 'Project Deadline',
-            description: 'Submit final report',
-            datetime: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-            priority: 'URGENT',
-            isCompleted: false
-          },
-          {
-            id: 4,
-            title: 'Grocery Shopping',
-            description: 'Buy groceries for the week',
-            datetime: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-            priority: 'LOW',
-            isCompleted: true
-          },
-          {
-            id: 5,
-            title: 'Client Call',
-            description: 'Discuss project requirements',
-            datetime: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
-            priority: 'HIGH',
-            isCompleted: false
-          },
-          {
-            id: 6,
-            title: 'Gym Session',
-            description: 'Weekly workout',
-            datetime: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-            priority: 'MEDIUM',
-            isCompleted: true
-          }
-        ];
-        calculateAnalytics(mockReminders);
-      }
-    } catch (error) {
-      console.error('Error loading analytics:', error);
-      // Use mock data as fallback
-      const mockReminders: Reminder[] = [
-        {
-          id: 1,
-          title: 'Team Meeting',
-          description: 'Weekly team sync',
-          datetime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-          priority: 'HIGH',
-          isCompleted: false
-        },
-        {
-          id: 2,
-          title: 'Doctor Appointment',
-          description: 'Annual checkup',
-          datetime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-          priority: 'MEDIUM',
-          isCompleted: false
-        },
-        {
-          id: 3,
-          title: 'Project Deadline',
-          description: 'Submit final report',
-          datetime: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-          priority: 'URGENT',
-          isCompleted: false
-        },
-        {
-          id: 4,
-          title: 'Grocery Shopping',
-          description: 'Buy groceries for the week',
-          datetime: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-          priority: 'LOW',
-          isCompleted: true
-        },
-        {
-          id: 5,
-          title: 'Client Call',
-          description: 'Discuss project requirements',
-          datetime: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
-          priority: 'HIGH',
-          isCompleted: false
-        },
-        {
-          id: 6,
-          title: 'Gym Session',
-          description: 'Weekly workout',
-          datetime: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-          priority: 'MEDIUM',
-          isCompleted: true
-        }
-      ];
-      calculateAnalytics(mockReminders);
-    } finally {
-      setLoading(false);
+  const loadAnalytics = () => {
+    const user = db.getCurrentUser();
+    if (!user) {
+      router.push('/login');
+      return;
     }
+    const reminders = db.getReminders(user.id);
+    calculateAnalytics(reminders);
+    setLoading(false);
   };
 
   const calculateAnalytics = (reminders: Reminder[]) => {

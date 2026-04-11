@@ -17,6 +17,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import * as db from '@/lib/store';
 
 interface Reminder {
   id: number;
@@ -70,81 +71,51 @@ export default function EditReminderPage() {
     }
   }, [mounted, reminderId]);
 
-  const loadReminderData = async () => {
-    try {
-      const response = await fetch(`/api/reminders/${reminderId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setReminder(data);
-      } else {
-        toast.error('Failed to load reminder');
-        router.push('/dashboard');
-      }
-    } catch (error) {
-      console.error('Error loading reminder:', error);
-      toast.error('Failed to load reminder');
+  const loadReminderData = () => {
+    const user = db.getCurrentUser();
+    if (!user) return;
+    const r = db.getReminderById(parseInt(reminderId), user.id);
+    if (r) {
+      setReminder(r);
+    } else {
+      toast.error('Reminder not found');
       router.push('/dashboard');
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   };
 
-  const loadCategories = async () => {
-    try {
-      const response = await fetch('/api/categories');
-      if (response.ok) {
-        const data = await response.json();
-        setCategories(data);
-      }
-    } catch (error) {
-      console.error('Error loading categories:', error);
-    }
+  const loadCategories = () => {
+    const user = db.getCurrentUser();
+    if (!user) return;
+    setCategories(db.getCategories(user.id));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
 
-    try {
-      const response = await fetch(`/api/reminders/${reminderId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(reminder),
-      });
-
-      if (response.ok) {
-        toast.success('Reminder updated successfully!');
-        router.push('/dashboard');
-      } else {
-        const error = await response.json();
-        toast.error(error.error || 'Failed to update reminder');
-      }
-    } catch (error) {
-      console.error('Error updating reminder:', error);
+    const user = db.getCurrentUser();
+    if (!user) { setSaving(false); return; }
+    const updated = db.updateReminder(parseInt(reminderId), user.id, {
+      ...reminder,
+      datetime: new Date(reminder.datetime).toISOString(),
+    });
+    if (updated) {
+      toast.success('Reminder updated successfully!');
+      router.push('/dashboard');
+    } else {
       toast.error('Failed to update reminder');
-    } finally {
-      setSaving(false);
     }
+    setSaving(false);
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!confirm('Are you sure you want to delete this reminder?')) return;
-
-    try {
-      const response = await fetch(`/api/reminders/${reminderId}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        toast.success('Reminder deleted successfully!');
-        router.push('/dashboard');
-      } else {
-        toast.error('Failed to delete reminder');
-      }
-    } catch (error) {
-      console.error('Error deleting reminder:', error);
-      toast.error('Failed to delete reminder');
-    }
+    const user = db.getCurrentUser();
+    if (!user) return;
+    db.deleteReminder(parseInt(reminderId), user.id);
+    toast.success('Reminder deleted successfully!');
+    router.push('/dashboard');
   };
 
   if (!mounted || loading) {

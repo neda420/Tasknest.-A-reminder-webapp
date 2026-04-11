@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ArrowLeft, Plus, Edit, Trash2, FolderOpen } from 'lucide-react';
 import toast from 'react-hot-toast';
+import * as db from '@/lib/store';
 
 interface Category {
   id: number;
@@ -34,83 +35,34 @@ export default function CategoriesPage() {
     loadCategories();
   }, []);
 
-  const loadCategories = async () => {
-    try {
-      const response = await fetch('/api/categories');
-      if (response.ok) {
-        const data = await response.json();
-        setCategories(data);
-      } else {
-        // Fallback to mock data if API fails
-        console.log('API failed, using mock data');
-        const mockCategories: Category[] = [
-          { id: 1, name: 'Work', color: '#3B82F6', icon: '💼', reminderCount: 5 },
-          { id: 2, name: 'Personal', color: '#10B981', icon: '👤', reminderCount: 3 },
-          { id: 3, name: 'Health', color: '#EF4444', icon: '🏥', reminderCount: 2 },
-          { id: 4, name: 'Shopping', color: '#F59E0B', icon: '🛒', reminderCount: 1 },
-        ];
-        setCategories(mockCategories);
-      }
-    } catch (error) {
-      console.error('Error loading categories:', error);
-      // Use mock data as fallback
-      const mockCategories: Category[] = [
-        { id: 1, name: 'Work', color: '#3B82F6', icon: '💼', reminderCount: 5 },
-        { id: 2, name: 'Personal', color: '#10B981', icon: '👤', reminderCount: 3 },
-        { id: 3, name: 'Health', color: '#EF4444', icon: '🏥', reminderCount: 2 },
-        { id: 4, name: 'Shopping', color: '#F59E0B', icon: '🛒', reminderCount: 1 },
-      ];
-      setCategories(mockCategories);
-    }
+  const loadCategories = () => {
+    const user = db.getCurrentUser();
+    if (!user) return;
+    const cats = db.getCategories(user.id).map(c => ({
+      ...c,
+      reminderCount: db.getReminders(user.id).filter(r => r.categoryId === c.id).length,
+    }));
+    setCategories(cats);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.name.trim()) {
-      toast.error('Category name is required');
-      return;
+    if (!formData.name.trim()) { toast.error('Category name is required'); return; }
+    const user = db.getCurrentUser();
+    if (!user) return;
+
+    if (editingCategory) {
+      db.updateCategory(editingCategory.id, user.id, formData);
+      toast.success('Category updated successfully!');
+    } else {
+      db.createCategory(user.id, formData);
+      toast.success('Category created successfully!');
     }
 
-    try {
-      if (editingCategory) {
-        // Update existing category
-        const response = await fetch(`/api/categories/${editingCategory.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
-        });
-
-        if (response.ok) {
-          toast.success('Category updated successfully!');
-          loadCategories(); // Refresh categories
-        } else {
-          toast.error('Failed to update category');
-        }
-      } else {
-        // Create new category
-        const response = await fetch('/api/categories', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
-        });
-
-        if (response.ok) {
-          toast.success('Category created successfully!');
-          loadCategories(); // Refresh categories
-        } else {
-          toast.error('Failed to create category');
-        }
-      }
-
-      // Reset form
-      setFormData({ name: '', color: '#3B82F6', icon: '' });
-      setEditingCategory(null);
-      setShowForm(false);
-    } catch (error) {
-      console.error('Error saving category:', error);
-      toast.error('Error saving category');
-    }
+    setFormData({ name: '', color: '#3B82F6', icon: '' });
+    setEditingCategory(null);
+    setShowForm(false);
+    loadCategories();
   };
 
   const handleEdit = (category: Category) => {
@@ -123,24 +75,13 @@ export default function CategoriesPage() {
     setShowForm(true);
   };
 
-  const handleDelete = async (categoryId: number) => {
+  const handleDelete = (categoryId: number) => {
     if (!confirm('Are you sure you want to delete this category?')) return;
-    
-    try {
-      const response = await fetch(`/api/categories/${categoryId}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        toast.success('Category deleted successfully!');
-        loadCategories(); // Refresh categories
-      } else {
-        toast.error('Failed to delete category');
-      }
-    } catch (error) {
-      console.error('Error deleting category:', error);
-      toast.error('Error deleting category');
-    }
+    const user = db.getCurrentUser();
+    if (!user) return;
+    db.deleteCategory(categoryId, user.id);
+    toast.success('Category deleted successfully!');
+    loadCategories();
   };
 
   const handleCancel = () => {

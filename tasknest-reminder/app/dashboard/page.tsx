@@ -24,6 +24,7 @@ import {
   EyeOff
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import * as db from '@/lib/store';
 
 interface Reminder {
   id: number;
@@ -137,55 +138,31 @@ export default function DashboardPage() {
     };
   }, [userEmail]);
 
-  const loadDashboardData = async () => {
-    try {
-      // Load profile data first (fastest)
-      const profileResponse = await fetch('/api/user/profile');
-      if (profileResponse.ok) {
-        const profileData = await profileResponse.json();
-        setUserProfile({
-          name: profileData.name || '',
-          nickname: profileData.nickname || '',
-          imageUrl: profileData.imageUrl || ''
-        });
-      }
+  const loadDashboardData = () => {
+    const user = db.getCurrentUser();
+    if (!user) return;
 
-      // Load reminders and categories in parallel
-      const [remindersResponse, categoriesResponse] = await Promise.all([
-        fetch('/api/reminders'),
-        fetch('/api/categories')
-      ]);
+    setUserProfile({
+      name: user.name,
+      nickname: user.nickname || '',
+      imageUrl: user.avatar || '',
+    });
 
-      if (remindersResponse.ok) {
-        const data = await remindersResponse.json();
-        const reminders = data.reminders || [];
-        setReminders(reminders);
-        calculateStats(reminders);
-      }
+    const reminders = db.getReminders(user.id);
+    setReminders(reminders);
+    calculateStats(reminders);
 
-      if (categoriesResponse.ok) {
-        const categoriesData = await categoriesResponse.json();
-        setCategories(categoriesData);
-      }
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
-    }
+    const categories = db.getCategories(user.id).map(c => ({
+      ...c,
+      reminderCount: 0,
+    }));
+    setCategories(categories);
   };
 
-  const handleLogout = async () => {
-    try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-      });
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      // Clear cookies client-side as well
-      document.cookie = 'userEmail=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-      document.cookie = 'userId=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-      toast.success('Logged out successfully');
-      router.push('/login');
-    }
+  const handleLogout = () => {
+    db.clearAuthCookies();
+    toast.success('Logged out successfully');
+    router.push('/login');
   };
 
   const calculateStats = (reminders: Reminder[]) => {
@@ -200,150 +177,73 @@ export default function DashboardPage() {
     setStats(stats);
   };
 
-  const toggleComplete = async (reminderId: number) => {
-    try {
-      const response = await fetch(`/api/reminders/${reminderId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      
-      if (response.ok) {
-        // Update local state instead of refetching
-        setReminders(prevReminders => {
-          const updatedReminders = prevReminders.map(reminder => 
-            reminder.id === reminderId 
-              ? { ...reminder, isCompleted: !reminder.isCompleted }
-              : reminder
-          );
-          calculateStats(updatedReminders);
-          return updatedReminders;
-        });
-        toast.success('Reminder status updated!');
-      } else {
-        toast.error('Failed to update reminder');
-      }
-    } catch (error) {
-      console.error('Error toggling reminder:', error);
-      toast.error('Error updating reminder');
-    }
+  const toggleComplete = (reminderId: number) => {
+    const user = db.getCurrentUser();
+    if (!user) return;
+    const reminder = db.getReminderById(reminderId, user.id);
+    if (!reminder) return;
+    db.updateReminder(reminderId, user.id, { isCompleted: !reminder.isCompleted });
+    setReminders(prevReminders => {
+      const updated = prevReminders.map(r =>
+        r.id === reminderId ? { ...r, isCompleted: !r.isCompleted } : r
+      );
+      calculateStats(updated);
+      return updated;
+    });
+    toast.success('Reminder status updated!');
   };
 
-  const deleteReminder = async (reminderId: number) => {
+  const deleteReminder = (reminderId: number) => {
     if (!confirm('Are you sure you want to delete this reminder?')) return;
-    
-    try {
-      const response = await fetch(`/api/reminders/${reminderId}`, {
-        method: 'DELETE',
-      });
-      
-      if (response.ok) {
-        // Update local state instead of refetching
-        setReminders(prevReminders => {
-          const updatedReminders = prevReminders.filter(reminder => reminder.id !== reminderId);
-          calculateStats(updatedReminders);
-          return updatedReminders;
-        });
-        toast.success('Reminder deleted successfully');
-      } else {
-        toast.error('Failed to delete reminder');
-      }
-    } catch (error) {
-      console.error('Error deleting reminder:', error);
-      toast.error('Error deleting reminder');
-    }
+    const user = db.getCurrentUser();
+    if (!user) return;
+    db.deleteReminder(reminderId, user.id);
+    setReminders(prevReminders => {
+      const updated = prevReminders.filter(r => r.id !== reminderId);
+      calculateStats(updated);
+      return updated;
+    });
+    toast.success('Reminder deleted successfully');
   };
 
-  const addQuickReminder = async () => {
-    // Show a simple prompt for task name
+  const addQuickReminder = () => {
     const taskName = prompt('Enter task name:');
-    
-    if (!taskName || taskName.trim() === '') {
-      return; // User cancelled or entered empty name
-    }
-
-    try {
-      const newReminder = {
-        title: taskName.trim(),
-        description: 'Quick task created from dashboard',
-        datetime: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour from now
-        priority: 'MEDIUM',
-        isRecurring: false,
-        location: '',
-        notes: ''
-      };
-
-      const response = await fetch('/api/reminders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newReminder),
-      });
-
-      if (response.ok) {
-        const newReminderData = await response.json();
-        // Add to local state instead of refetching
-        setReminders(prevReminders => {
-          const updatedReminders = [...prevReminders, newReminderData];
-          calculateStats(updatedReminders);
-          return updatedReminders;
-        });
-        toast.success('Quick task added!');
-      } else {
-        toast.error('Failed to add task');
-      }
-    } catch (error) {
-      console.error('Error adding quick reminder:', error);
-      toast.error('Error adding task');
-    }
+    if (!taskName || taskName.trim() === '') return;
+    const user = db.getCurrentUser();
+    if (!user) return;
+    const newReminder = db.createReminder(user.id, {
+      title: taskName.trim(),
+      description: 'Quick task created from dashboard',
+      datetime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      priority: 'MEDIUM',
+      isCompleted: false,
+      isRecurring: false,
+    });
+    setReminders(prev => {
+      const updated = [...prev, newReminder];
+      calculateStats(updated);
+      return updated;
+    });
+    toast.success('Quick task added!');
   };
 
-  const addQuickCategory = async () => {
-    // Show a simple prompt for category name
+  const addQuickCategory = () => {
     const categoryName = prompt('Enter category name:');
-    
-    if (!categoryName || categoryName.trim() === '') {
-      return; // User cancelled or entered empty name
-    }
-
-    try {
-      const newCategory = {
-        name: categoryName.trim(),
-        color: '#3B82F6', // Default blue color
-        icon: '' // No icon for quick categories
-      };
-
-      const response = await fetch('/api/categories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newCategory),
-      });
-
-      if (response.ok) {
-        toast.success('Quick category added!');
-      } else {
-        const error = await response.json();
-        toast.error(error.error || 'Failed to add category');
-      }
-    } catch (error) {
-      console.error('Error adding quick category:', error);
-      toast.error('Error adding category');
-    }
+    if (!categoryName || categoryName.trim() === '') return;
+    const user = db.getCurrentUser();
+    if (!user) return;
+    db.createCategory(user.id, { name: categoryName.trim(), color: '#3B82F6' });
+    toast.success('Quick category added!');
   };
 
-  // Function to refresh profile data specifically (only when needed)
-  const refreshProfileData = async () => {
-    try {
-      const profileResponse = await fetch('/api/user/profile');
-      if (profileResponse.ok) {
-        const profileData = await profileResponse.json();
-        setUserProfile({
-          name: profileData.name || '',
-          nickname: profileData.nickname || '',
-          imageUrl: profileData.imageUrl || ''
-        });
-      }
-    } catch (error) {
-      console.error('Error refreshing profile data:', error);
-    }
+  const refreshProfileData = () => {
+    const user = db.getCurrentUser();
+    if (!user) return;
+    setUserProfile({
+      name: user.name,
+      nickname: user.nickname || '',
+      imageUrl: user.avatar || '',
+    });
   };
 
   const filteredReminders = reminders.filter(reminder => {

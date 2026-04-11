@@ -15,6 +15,7 @@ import {
   Bell,
   Settings as SettingsIcon
 } from 'lucide-react';
+import * as db from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -70,18 +71,9 @@ export default function SettingsPage() {
 
   useEffect(() => {
     setMounted(true);
-    
-    // Get user email from cookie
-    const getCookie = (name: string) => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop()?.split(';').shift();
-      return null;
-    };
-
-    const email = getCookie('userEmail');
-    if (email) {
-      setUserEmail(email);
+    const user = db.getCurrentUser();
+    if (user) {
+      setUserEmail(user.email);
       loadUserProfile();
     } else {
       setLoading(false);
@@ -95,38 +87,31 @@ export default function SettingsPage() {
     }
   }, [userEmail, mounted]);
 
-  const loadAccountInfo = async () => {
-    try {
-      const response = await fetch('/api/user/account-info');
-      if (response.ok) {
-        const accountData = await response.json();
-        setAccountInfo(accountData);
-      } else {
-        console.error('Failed to load account info:', response.status);
-      }
-    } catch (error) {
-      console.error('Error loading account info:', error);
-    }
+  const loadAccountInfo = () => {
+    const user = db.getCurrentUser();
+    if (!user) return;
+    setAccountInfo({
+      memberSince: new Date(user.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+      lastLogin: user.lastLogin
+        ? new Date(user.lastLogin).toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+        : 'N/A',
+      status: user.isActive ? 'Active' : 'Inactive',
+    });
   };
 
-  const loadUserProfile = async () => {
-    try {
-      const response = await fetch('/api/user/profile');
-      if (response.ok) {
-        const profileData = await response.json();
-        setProfile(profileData);
-        setImagePreview(profileData.imageUrl || '');
-        await loadAccountInfo();
-      } else {
-        console.error('Failed to load profile data:', response.status);
-        toast.error('Failed to load profile data');
-      }
-    } catch (error) {
-      console.error('Error loading profile:', error);
-      toast.error('Failed to load profile data');
-    } finally {
-      setLoading(false);
-    }
+  const loadUserProfile = () => {
+    const user = db.getCurrentUser();
+    if (!user) { setLoading(false); return; }
+    setProfile({
+      id: user.id.toString(),
+      email: user.email,
+      name: user.name,
+      nickname: user.nickname || '',
+      imageUrl: user.avatar || '',
+    });
+    setImagePreview(user.avatar || '');
+    loadAccountInfo();
+    setLoading(false);
   };
 
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -141,49 +126,34 @@ export default function SettingsPage() {
     }
   };
 
-  const handleProfileUpdate = async () => {
+  const handleProfileUpdate = () => {
     setSaving(true);
-    try {
-      const formData = new FormData();
-      formData.append('name', profile.name);
-      formData.append('nickname', profile.nickname);
-      formData.append('email', profile.email);
-      if (imageFile) {
-        formData.append('image', imageFile);
-      }
+    const user = db.getCurrentUser();
+    if (!user) { setSaving(false); return; }
 
-      const response = await fetch('/api/user/profile', {
-        method: 'PUT',
-        body: formData,
-      });
-
-      if (response.ok) {
-        const updatedProfile = await response.json();
-        
-        setProfile(updatedProfile);
-        
-        if (updatedProfile.imageUrl) {
-          setImagePreview(updatedProfile.imageUrl);
-        }
-        
+    const avatarValue = imagePreview || profile.imageUrl;
+    if (imageFile) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        db.updateUser(user.id, { name: profile.name, nickname: profile.nickname, avatar: dataUrl });
+        setProfile(prev => ({ ...prev, imageUrl: dataUrl }));
+        setImagePreview(dataUrl);
         setImageFile(null);
-        
+        localStorage.setItem('profileUpdated', '1');
         toast.success('Profile updated successfully!');
-        
-        await loadAccountInfo();
-        
-        // Notify dashboard to refresh profile data
-        localStorage.setItem('profileUpdated', Date.now().toString());
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.error || 'Failed to update profile');
-      }
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      toast.error('Failed to update profile');
-    } finally {
-      setSaving(false);
+        loadAccountInfo();
+        setSaving(false);
+      };
+      reader.readAsDataURL(imageFile);
+      return;
     }
+
+    db.updateUser(user.id, { name: profile.name, nickname: profile.nickname, avatar: avatarValue });
+    localStorage.setItem('profileUpdated', '1');
+    toast.success('Profile updated successfully!');
+    loadAccountInfo();
+    setSaving(false);
   };
 
   const handlePasswordChange = async () => {
@@ -202,57 +172,23 @@ export default function SettingsPage() {
       return;
     }
 
-    setSaving(true);
-    try {
-      // Try to change password via API
-      const response = await fetch('/api/user/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          currentPassword: passwordData.currentPassword,
-          newPassword: passwordData.newPassword
-        }),
-      });
-
-      if (response.ok) {
-        toast.success('Password changed successfully!');
-        setPasswordData({
-          currentPassword: '',
-          newPassword: '',
-          confirmPassword: ''
-        });
-      } else {
-        const errorData = await response.json();
-        toast.error(errorData.error || 'Failed to change password');
-      }
-    } catch (error) {
-      console.error('Error changing password:', error);
-      toast.error('Failed to change password');
-    } finally {
-      setSaving(false);
+    const user = db.getCurrentUser();
+    if (!user) return;
+    const hashedCurrent = await db.hashPassword(passwordData.currentPassword);
+    if (user.password !== hashedCurrent) {
+      toast.error('Current password is incorrect');
+      return;
     }
+    const hashedNew = await db.hashPassword(passwordData.newPassword);
+    db.updateUser(user.id, { password: hashedNew });
+    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    toast.success('Password changed successfully!');
   };
 
-  const handleLogout = async () => {
-    try {
-      // Call logout API
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-      });
-
-      // Clear cookies regardless of API response
-      document.cookie = 'userEmail=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-      document.cookie = 'userId=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-      
-      toast.success('Logged out successfully');
-      router.push('/login');
-    } catch (error) {
-      console.error('Error logging out:', error);
-      // Still clear cookies and redirect even if API fails
-      document.cookie = 'userEmail=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-      document.cookie = 'userId=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-      router.push('/login');
-    }
+  const handleLogout = () => {
+    db.clearAuthCookies();
+    toast.success('Logged out successfully');
+    router.push('/login');
   };
 
   if (!mounted || loading) {

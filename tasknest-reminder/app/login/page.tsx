@@ -2,17 +2,17 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Bell, Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { getUserByEmail, setAuthCookies, updateUser, hashPassword } from '@/lib/store';
 
 export default function LoginPage() {
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
+  const router = useRouter();
+  const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -20,43 +20,34 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
 
-    try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
+    const user = getUserByEmail(formData.email);
+    const hashed = await hashPassword(formData.password);
 
-      const data = await response.json();
-
-      if (response.ok) {
-        toast.success('Login successful!');
-        // Use role from API response to determine redirect
-        setTimeout(() => {
-          if (data.user?.role === 'ADMIN') {
-            window.location.href = '/dashboard/admin';
-          } else {
-            window.location.href = '/dashboard';
-          }
-        }, 100);
-      } else {
-        toast.error(data.error || 'Login failed');
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-      toast.error('An error occurred during login');
-    } finally {
+    if (!user || user.password !== hashed) {
+      toast.error('Invalid email or password');
       setLoading(false);
+      return;
     }
+
+    if (!user.isActive) {
+      toast.error('Your account is disabled');
+      setLoading(false);
+      return;
+    }
+
+    updateUser(user.id, { lastLogin: new Date().toISOString() });
+    setAuthCookies(user);
+    toast.success('Login successful!');
+
+    setTimeout(() => {
+      router.push(user.role === 'ADMIN' ? '/dashboard/admin' : '/dashboard');
+    }, 100);
+
+    setLoading(false);
   };
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   return (
@@ -73,16 +64,12 @@ export default function LoginPage() {
         <Card>
           <CardHeader>
             <CardTitle>Sign In</CardTitle>
-            <CardDescription>
-              Enter your credentials to access your reminders
-            </CardDescription>
+            <CardDescription>Enter your credentials to access your reminders</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email Address
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
@@ -97,9 +84,7 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Password
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
@@ -125,9 +110,7 @@ export default function LoginPage() {
                 disabled={loading || !formData.email || !formData.password}
                 className="w-full"
               >
-                {loading ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                ) : null}
+                {loading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />}
                 {loading ? 'Signing in...' : 'Sign In'}
               </Button>
             </form>
