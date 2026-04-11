@@ -79,7 +79,7 @@ export default function SettingsPage() {
       return null;
     };
 
-    const email = getCookie('user-email') || getCookie('userEmail');
+    const email = getCookie('userEmail');
     if (email) {
       setUserEmail(email);
       loadUserProfile();
@@ -97,68 +97,25 @@ export default function SettingsPage() {
 
   const loadAccountInfo = async () => {
     try {
-      console.log('Loading account info...');
-      // Fetch account info from API
       const response = await fetch('/api/user/account-info');
       if (response.ok) {
         const accountData = await response.json();
-        console.log('Account info received:', accountData);
         setAccountInfo(accountData);
       } else {
         console.error('Failed to load account info:', response.status);
-        // Use current date as fallback for member since
-        setAccountInfo({
-          memberSince: new Date().toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-          }),
-          lastLogin: new Date().toLocaleString('en-US', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-          }),
-          status: 'Active'
-        });
       }
     } catch (error) {
       console.error('Error loading account info:', error);
-      // Use current date as fallback
-      setAccountInfo({
-        memberSince: new Date().toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        }),
-        lastLogin: new Date().toLocaleString('en-US', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        }),
-        status: 'Active'
-      });
     }
   };
 
   const loadUserProfile = async () => {
-    console.log('Loading user profile for email:', userEmail);
     try {
-      // Fetch real profile data from API
       const response = await fetch('/api/user/profile');
       if (response.ok) {
         const profileData = await response.json();
-        console.log('Profile data received:', profileData);
-        console.log('Settings: Image URL from API:', profileData.imageUrl ? profileData.imageUrl.substring(0, 50) + '...' : 'No image');
         setProfile(profileData);
         setImagePreview(profileData.imageUrl || '');
-        
-        // Load account information including member since date
         await loadAccountInfo();
       } else {
         console.error('Failed to load profile data:', response.status);
@@ -168,7 +125,6 @@ export default function SettingsPage() {
       console.error('Error loading profile:', error);
       toast.error('Failed to load profile data');
     } finally {
-      console.log('Setting loading to false');
       setLoading(false);
     }
   };
@@ -188,9 +144,6 @@ export default function SettingsPage() {
   const handleProfileUpdate = async () => {
     setSaving(true);
     try {
-      console.log('Updating profile with data:', { name: profile.name, nickname: profile.nickname });
-      
-      // Create form data for file upload
       const formData = new FormData();
       formData.append('name', profile.name);
       formData.append('nickname', profile.nickname);
@@ -199,7 +152,6 @@ export default function SettingsPage() {
         formData.append('image', imageFile);
       }
 
-      // Try to update profile via API
       const response = await fetch('/api/user/profile', {
         method: 'PUT',
         body: formData,
@@ -207,23 +159,17 @@ export default function SettingsPage() {
 
       if (response.ok) {
         const updatedProfile = await response.json();
-        console.log('Profile updated successfully:', updatedProfile);
         
-        // Update the profile state with new data
         setProfile(updatedProfile);
         
-        // Update image preview if new image was uploaded
         if (updatedProfile.imageUrl) {
-          console.log('Settings: Updating image preview with:', updatedProfile.imageUrl.substring(0, 50) + '...');
           setImagePreview(updatedProfile.imageUrl);
         }
         
-        // Clear the image file since it's been uploaded
         setImageFile(null);
         
         toast.success('Profile updated successfully!');
         
-        // Refresh account info to ensure everything is up to date
         await loadAccountInfo();
         
         // Notify dashboard to refresh profile data
@@ -290,21 +236,21 @@ export default function SettingsPage() {
   const handleLogout = async () => {
     try {
       // Call logout API
-      const response = await fetch('/api/auth/logout', {
+      await fetch('/api/auth/logout', {
         method: 'POST',
       });
 
       // Clear cookies regardless of API response
-      document.cookie = 'auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-      document.cookie = 'user-email=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      document.cookie = 'userEmail=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      document.cookie = 'userId=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
       
       toast.success('Logged out successfully');
       router.push('/login');
     } catch (error) {
       console.error('Error logging out:', error);
       // Still clear cookies and redirect even if API fails
-      document.cookie = 'auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-      document.cookie = 'user-email=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      document.cookie = 'userEmail=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      document.cookie = 'userId=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
       router.push('/login');
     }
   };
@@ -377,11 +323,6 @@ export default function SettingsPage() {
                           src={imagePreview} 
                           alt="Profile" 
                           className="w-full h-full object-cover"
-                          onLoad={() => console.log('Settings: Image loaded successfully')}
-                          onError={(e) => {
-                            console.error('Settings: Image failed to load:', e);
-                            console.log('Settings: Image source was:', imagePreview.substring(0, 100) + '...');
-                          }}
                         />
                       ) : (
                         <User className="h-12 w-12 text-gray-400" />
@@ -454,23 +395,6 @@ export default function SettingsPage() {
                       <Save className="h-4 w-4 mr-2" />
                     )}
                     {saving ? 'Saving...' : 'Save Changes'}
-                  </Button>
-                  <Button 
-                    variant="outline"
-                    onClick={async () => {
-                      try {
-                        const response = await fetch('/api/test-profile-picture');
-                        const data = await response.json();
-                        console.log('Profile picture test:', data);
-                        toast.success('Check console for profile picture debug info');
-                      } catch (error) {
-                        console.error('Error testing profile picture:', error);
-                        toast.error('Failed to test profile picture');
-                      }
-                    }}
-                    className="px-3"
-                  >
-                    Debug
                   </Button>
                 </div>
               </CardContent>

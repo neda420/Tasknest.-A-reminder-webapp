@@ -1,23 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import prisma from '@/lib/prisma';
+import { z } from 'zod';
+
+const updateReminderSchema = z.object({
+  title: z.string().min(1, 'Title is required').optional(),
+  description: z.string().optional(),
+  datetime: z.string().datetime().optional(),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
+  isCompleted: z.boolean().optional(),
+  isRecurring: z.boolean().optional(),
+  recurrence: z.enum(['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY', 'CUSTOM']).nullable().optional(),
+  categoryId: z.number().nullable().optional(),
+  location: z.string().optional(),
+  notes: z.string().optional(),
+});
 
 // Helper function to get user email from cookies
 async function getUserEmail(request: NextRequest) {
-  // Try to get from server-side cookies first
   const cookieStore = await cookies();
   let userEmail = cookieStore.get('userEmail')?.value;
 
-  // If not found in server-side cookies, try from request headers (client-side cookies)
   if (!userEmail) {
     const cookieHeader = request.headers.get('cookie');
     if (cookieHeader) {
-      const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
+      const parsed = cookieHeader.split(';').reduce((acc, cookie) => {
         const [key, value] = cookie.trim().split('=');
         acc[key] = value;
         return acc;
       }, {} as Record<string, string>);
-      userEmail = cookies['userEmail'];
+      userEmail = parsed['userEmail'];
     }
   }
 
@@ -42,7 +54,7 @@ export async function GET(
     }
 
     // Get user
-    const user = await (prisma as any).user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { email: userEmail },
     });
 
@@ -51,7 +63,7 @@ export async function GET(
     }
 
     // Get reminder
-    const reminder = await (prisma as any).reminder.findFirst({
+    const reminder = await prisma.reminder.findFirst({
       where: {
         id: reminderId,
         userId: user.id,
@@ -90,9 +102,17 @@ export async function PUT(
     }
 
     const body = await request.json();
+    const parseResult = updateReminderSchema.safeParse(body);
+    if (!parseResult.success) {
+      return NextResponse.json(
+        { error: 'Validation error', details: parseResult.error.errors },
+        { status: 400 }
+      );
+    }
+    const validatedData = parseResult.data;
 
     // Get user
-    const user = await (prisma as any).user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { email: userEmail },
     });
 
@@ -101,7 +121,7 @@ export async function PUT(
     }
 
     // Check if reminder exists and belongs to user
-    const existingReminder = await (prisma as any).reminder.findFirst({
+    const existingReminder = await prisma.reminder.findFirst({
       where: {
         id: reminderId,
         userId: user.id,
@@ -112,12 +132,12 @@ export async function PUT(
       return NextResponse.json({ error: 'Reminder not found' }, { status: 404 });
     }
 
-    // Update reminder
-    const updatedReminder = await (prisma as any).reminder.update({
+    // Update reminder with only validated fields
+    const updatedReminder = await prisma.reminder.update({
       where: { id: reminderId },
       data: {
-        ...body,
-        ...(body.datetime && { datetime: new Date(body.datetime) }),
+        ...validatedData,
+        ...(validatedData.datetime && { datetime: new Date(validatedData.datetime) }),
       },
     });
 
@@ -149,7 +169,7 @@ export async function DELETE(
     }
 
     // Get user
-    const user = await (prisma as any).user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { email: userEmail },
     });
 
@@ -158,7 +178,7 @@ export async function DELETE(
     }
 
     // Check if reminder exists and belongs to user
-    const existingReminder = await (prisma as any).reminder.findFirst({
+    const existingReminder = await prisma.reminder.findFirst({
       where: {
         id: reminderId,
         userId: user.id,
@@ -170,7 +190,7 @@ export async function DELETE(
     }
 
     // Delete reminder
-    await (prisma as any).reminder.delete({
+    await prisma.reminder.delete({
       where: { id: reminderId },
     });
 
@@ -202,7 +222,7 @@ export async function PATCH(
     }
 
     // Get user
-    const user = await (prisma as any).user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { email: userEmail },
     });
 
@@ -211,7 +231,7 @@ export async function PATCH(
     }
 
     // Get current reminder
-    const reminder = await (prisma as any).reminder.findFirst({
+    const reminder = await prisma.reminder.findFirst({
       where: {
         id: reminderId,
         userId: user.id,
@@ -223,7 +243,7 @@ export async function PATCH(
     }
 
     // Toggle completion status
-    const updatedReminder = await (prisma as any).reminder.update({
+    const updatedReminder = await prisma.reminder.update({
       where: { id: reminderId },
       data: {
         isCompleted: !reminder.isCompleted,

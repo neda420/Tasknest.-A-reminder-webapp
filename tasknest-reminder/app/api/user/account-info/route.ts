@@ -5,45 +5,41 @@ import prisma from '@/lib/prisma';
 export async function GET() {
   try {
     const cookieStore = await cookies();
-    const userEmail = cookieStore.get('user-email')?.value || cookieStore.get('userEmail')?.value;
+    const userEmail = cookieStore.get('userEmail')?.value;
 
     if (!userEmail) {
       return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({
-      where: { email: userEmail }
+      where: { email: userEmail },
     });
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Format the member since date (actual registration date from database)
-    const memberSinceDate = new Date((user as any).createdAt || new Date());
-    const memberSince = memberSinceDate.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-
-    // Format the last login date (using updatedAt as last activity)
-    const lastLoginDate = new Date((user as any).updatedAt || new Date());
-    const lastLogin = lastLoginDate.toLocaleString('en-US', {
-      weekday: 'long',
+    const memberSince = user.createdAt.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
     });
 
-    console.log('Account info fetched:', { memberSince, lastLogin, status: 'Active' });
+    const lastLogin = user.lastLogin
+      ? user.lastLogin.toLocaleString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : 'Never';
 
     const accountInfo = {
       memberSince,
       lastLogin,
-      status: 'Active'
+      status: user.isActive ? 'Active' : 'Inactive',
     };
 
     return NextResponse.json(accountInfo);
@@ -51,4 +47,5 @@ export async function GET() {
     console.error('Error fetching account info:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-} 
+}
+ 

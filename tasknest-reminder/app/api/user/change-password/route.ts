@@ -6,7 +6,7 @@ import bcrypt from 'bcryptjs';
 export async function POST(request: NextRequest) {
   try {
     const cookieStore = await cookies();
-    const userEmail = cookieStore.get('user-email')?.value || cookieStore.get('userEmail')?.value;
+    const userEmail = cookieStore.get('userEmail')?.value;
 
     if (!userEmail) {
       return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });

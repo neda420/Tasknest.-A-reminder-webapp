@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, BarChart3, Calendar, Clock, CheckCircle, AlertTriangle, TrendingUp, Target, Plus } from 'lucide-react';
+import { ArrowLeft, BarChart3, Clock, CheckCircle, AlertTriangle, TrendingUp, Target, Plus } from 'lucide-react';
 
 interface Reminder {
   id: number;
@@ -423,7 +423,7 @@ export default function AnalyticsPage() {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  <h4 className="font-semibold text-lg">What's Working Well</h4>
+                  <h4 className="font-semibold text-lg">What&apos;s Working Well</h4>
                   <ul className="space-y-2 text-sm text-gray-600">
                     {analytics.completionRate > 70 && (
                       <li className="flex items-start space-x-2">

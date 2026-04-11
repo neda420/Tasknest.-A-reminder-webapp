@@ -3,13 +3,24 @@ import { cookies } from 'next/headers';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 
-export async function GET(request: NextRequest) {
+async function requireAdmin(): Promise<{ error: NextResponse } | { userId: number }> {
   const cookieStore = await cookies();
   const userEmail = decodeURIComponent(cookieStore.get('userEmail')?.value || '');
-  if (userEmail !== 'admin@gmail.com') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!userEmail) {
+    return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
   }
-  const users = await (prisma as any).user.findMany({
+  const user = await prisma.user.findUnique({ where: { email: userEmail }, select: { id: true, role: true } });
+  if (!user || user.role !== 'ADMIN') {
+    return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
+  }
+  return { userId: user.id };
+}
+
+export async function GET() {
+  const auth = await requireAdmin();
+  if ('error' in auth) return auth.error;
+
+  const users = await prisma.user.findMany({
     select: {
       id: true,
       name: true,
@@ -26,17 +37,15 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const cookieStore = await cookies();
-  const userEmail = decodeURIComponent(cookieStore.get('userEmail')?.value || '');
-  if (userEmail !== 'admin@gmail.com') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const auth = await requireAdmin();
+  if ('error' in auth) return auth.error;
+
   const body = await request.json();
   const { id, name, email, nickname } = body;
   if (!id || !name || !email) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
   }
-  const updatedUser = await (prisma as any).user.update({
+  const updatedUser = await prisma.user.update({
     where: { id },
     data: { name, email, nickname },
   });
@@ -44,44 +53,42 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const cookieStore = await cookies();
-  const userEmail = decodeURIComponent(cookieStore.get('userEmail')?.value || '');
-  if (userEmail !== 'admin@gmail.com') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const auth = await requireAdmin();
+  if ('error' in auth) return auth.error;
+
   const body = await request.json();
   const { name, email, password, nickname } = body;
   if (!name || !email || !password) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
   }
   const hashedPassword = await bcrypt.hash(password, 10);
-  const newUser = await (prisma as any).user.create({
+  const newUser = await prisma.user.create({
     data: { name, email, password: hashedPassword, nickname },
   });
   return NextResponse.json({ user: newUser });
 }
 
 export async function DELETE(request: NextRequest) {
-  const cookieStore = await cookies();
-  const userEmail = decodeURIComponent(cookieStore.get('userEmail')?.value || '');
-  if (userEmail !== 'admin@gmail.com') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const auth = await requireAdmin();
+  if ('error' in auth) return auth.error;
+
   const { searchParams } = new URL(request.url);
   const id = parseInt(searchParams.get('id') || '');
   if (!id) {
     return NextResponse.json({ error: 'Missing user id' }, { status: 400 });
   }
-  await (prisma as any).user.delete({ where: { id } });
+  // Prevent admin from deleting their own account
+  if (id === auth.userId) {
+    return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 });
+  }
+  await prisma.user.delete({ where: { id } });
   return NextResponse.json({ message: 'User deleted' });
 }
 
 export async function PATCH(request: NextRequest) {
-  const cookieStore = await cookies();
-  const userEmail = decodeURIComponent(cookieStore.get('userEmail')?.value || '');
-  if (userEmail !== 'admin@gmail.com') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const auth = await requireAdmin();
+  if ('error' in auth) return auth.error;
+
   const body = await request.json();
   const { id, action, value } = body;
   if (!id || !action) {
@@ -93,12 +100,16 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 });
     }
     const hashedPassword = await bcrypt.hash(value, 10);
-    updatedUser = await (prisma as any).user.update({
+    updatedUser = await prisma.user.update({
       where: { id },
       data: { password: hashedPassword },
     });
   } else if (action === 'toggleActive') {
-    updatedUser = await (prisma as any).user.update({
+    // Prevent admin from deactivating their own account
+    if (id === auth.userId) {
+      return NextResponse.json({ error: 'Cannot deactivate your own account' }, { status: 400 });
+    }
+    updatedUser = await prisma.user.update({
       where: { id },
       data: { isActive: value },
     });
@@ -106,7 +117,7 @@ export async function PATCH(request: NextRequest) {
     if (!['USER', 'MODERATOR', 'ADMIN'].includes(value)) {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
     }
-    updatedUser = await (prisma as any).user.update({
+    updatedUser = await prisma.user.update({
       where: { id },
       data: { role: value },
     });
@@ -114,4 +125,5 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   }
   return NextResponse.json({ user: updatedUser });
-} 
+}
+ 
