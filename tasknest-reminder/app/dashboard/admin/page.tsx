@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "react-hot-toast";
 import { LogOut, UserCircle } from "lucide-react";
+import * as db from "@/lib/store";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 
@@ -34,12 +35,11 @@ export default function AdminPage() {
   const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [addUserData, setAddUserData] = useState({ name: "", email: "", password: "", nickname: "" });
   const [editUserData, setEditUserData] = useState({ id: 0, name: "", email: "", nickname: "" });
-  const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
+  const [deletingUserId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [userReminders, setUserReminders] = useState<Reminder[]>([]);
@@ -48,7 +48,7 @@ export default function AdminPage() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordUser, setPasswordUser] = useState<User | null>(null);
   const [newPassword, setNewPassword] = useState("");
-  const [resettingPassword, setResettingPassword] = useState(false);
+  const [resettingPassword] = useState(false);
 
   // Stats
   const totalUsers = users.length;
@@ -66,25 +66,13 @@ export default function AdminPage() {
   }, []);
 
   const fetchUsers = () => {
-    setLoading(true);
-    fetch("/api/admin/users", { credentials: "include" })
-      .then((res) => {
-        if (res.status === 403 || res.status === 401) {
-          router.push('/dashboard');
-          return null;
-        }
-        if (!res.ok) throw new Error("Failed to fetch users");
-        return res.json();
-      })
-      .then((data) => {
-        if (!data) return;
-        setUsers(data.users);
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(err.message);
-        setLoading(false);
-      });
+    const currentUser = db.getCurrentUser();
+    if (!currentUser || currentUser.role !== 'ADMIN') {
+      router.push('/dashboard');
+      return;
+    }
+    setUsers(db.getUsers());
+    setLoading(false);
   };
 
   // Edit user
@@ -95,21 +83,12 @@ export default function AdminPage() {
   const handleEditChange = (field: string, value: string) => {
     setEditUserData((prev) => ({ ...prev, [field]: value }));
   };
-  const handleEditSubmit = async (e: React.FormEvent) => {
+  const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const res = await fetch("/api/admin/users", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify(editUserData),
-    });
-    if (res.ok) {
-      toast.success("User updated");
-      setShowEditModal(false);
-      fetchUsers();
-    } else {
-      toast.error("Failed to update user");
-    }
+    db.updateUser(editUserData.id, { name: editUserData.name, email: editUserData.email, nickname: editUserData.nickname });
+    toast.success("User updated");
+    setShowEditModal(false);
+    fetchUsers();
   };
 
   // Add user
@@ -120,66 +99,39 @@ export default function AdminPage() {
   const handleAddChange = (field: string, value: string) => {
     setAddUserData((prev) => ({ ...prev, [field]: value }));
   };
-  const handleAddSubmit = async (e: React.FormEvent) => {
+  const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const res = await fetch("/api/admin/users", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify(addUserData),
-    });
-    if (res.ok) {
-      toast.success("User added");
-      setShowAddModal(false);
-      fetchUsers();
-    } else {
-      toast.error("Failed to add user");
+    if (db.getUserByEmail(addUserData.email)) {
+      toast.error("Email already exists");
+      return;
     }
+    db.createUser({ name: addUserData.name, email: addUserData.email, password: addUserData.password });
+    toast.success("User added");
+    setShowAddModal(false);
+    fetchUsers();
   };
 
   // Delete user
-  const handleDeleteUser = async (id: number) => {
+  const handleDeleteUser = (id: number) => {
     if (!window.confirm("Are you sure you want to delete this user? This cannot be undone.")) return;
-    setDeletingUserId(id);
-    const res = await fetch(`/api/admin/users?id=${id}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
-    setDeletingUserId(null);
-    if (res.ok) {
-      toast.success("User deleted");
-      fetchUsers();
-    } else {
-      toast.error("Failed to delete user");
-    }
+    db.deleteUser(id);
+    toast.success("User deleted");
+    fetchUsers();
   };
 
   // Logout
-  const handleLogout = async () => {
-    try {
-      await fetch("/api/auth/logout", { method: "POST" });
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      document.cookie = 'userEmail=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-      document.cookie = 'userId=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-      toast.success("Logged out");
-      router.push("/login");
-    }
+  const handleLogout = () => {
+    db.clearAuthCookies();
+    toast.success("Logged out");
+    router.push("/login");
   };
 
   // Show reminders for a user
-  const openRemindersModal = async (user: User) => {
+  const openRemindersModal = (user: User) => {
     setSelectedUser(user);
     setRemindersLoading(true);
     setShowRemindersModal(true);
-    const res = await fetch(`/api/admin/user-reminders?id=${user.id}`, { credentials: "include" });
-    if (res.ok) {
-      const data = await res.json();
-      setUserReminders(data.reminders);
-    } else {
-      setUserReminders([]);
-    }
+    setUserReminders(db.getAllReminders().filter(r => r.userId === user.id));
     setRemindersLoading(false);
   };
 
@@ -189,56 +141,28 @@ export default function AdminPage() {
     setNewPassword("");
     setShowPasswordModal(true);
   };
-  const handlePasswordReset = async (e: React.FormEvent) => {
+  const handlePasswordReset = (e: React.FormEvent) => {
     e.preventDefault();
     if (!passwordUser) return;
-    setResettingPassword(true);
-    const res = await fetch("/api/admin/users", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ id: passwordUser.id, action: "resetPassword", value: newPassword }),
-    });
-    setResettingPassword(false);
-    if (res.ok) {
-      toast.success("Password reset");
-      setShowPasswordModal(false);
-    } else {
-      const data = await res.json();
-      toast.error(data.error || "Failed to reset password");
-    }
+    db.updateUser(passwordUser.id, { password: newPassword });
+    toast.success("Password reset successfully");
+    setShowPasswordModal(false);
+    setNewPassword("");
+    setPasswordUser(null);
   };
 
   // Handle toggle active
-  const handleToggleActive = async (user: User, value: boolean) => {
-    const res = await fetch("/api/admin/users", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ id: user.id, action: "toggleActive", value }),
-    });
-    if (res.ok) {
-      toast.success(value ? "User activated" : "User deactivated");
-      fetchUsers();
-    } else {
-      toast.error("Failed to update status");
-    }
+  const handleToggleActive = (user: User, value: boolean) => {
+    db.updateUser(user.id, { isActive: value });
+    toast.success(value ? "User activated" : "User deactivated");
+    fetchUsers();
   };
 
   // Handle change role
-  const handleChangeRole = async (user: User, value: string) => {
-    const res = await fetch("/api/admin/users", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ id: user.id, action: "changeRole", value }),
-    });
-    if (res.ok) {
-      toast.success("Role updated");
-      fetchUsers();
-    } else {
-      toast.error("Failed to update role");
-    }
+  const handleChangeRole = (user: User, value: string) => {
+    db.updateUser(user.id, { role: value as 'USER' | 'ADMIN' });
+    toast.success("Role updated");
+    fetchUsers();
   };
 
   if (loading) {
@@ -248,22 +172,6 @@ export default function AdminPage() {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading users...</p>
         </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <Card>
-          <CardHeader>
-            <CardTitle>Error</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-red-600">{error}</p>
-            <Button className="mt-4" onClick={() => router.push("/dashboard")}>Go to Dashboard</Button>
-          </CardContent>
-        </Card>
       </div>
     );
   }

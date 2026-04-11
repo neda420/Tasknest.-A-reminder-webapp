@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Save, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
+import * as db from '@/lib/store';
 
 interface Category {
   id: number;
@@ -49,51 +50,34 @@ export default function ReminderForm() {
     loadCategories();
   }, []);
 
-  const loadCategories = async () => {
-    try {
-      const response = await fetch('/api/categories');
-      if (response.ok) {
-        const data = await response.json();
-        setCategories(data);
-      }
-    } catch (error) {
-      console.error('Error loading categories:', error);
-    } finally {
-      setLoadingCategories(false);
-    }
+  const loadCategories = () => {
+    const user = db.getCurrentUser();
+    if (!user) { setLoadingCategories(false); return; }
+    setCategories(db.getCategories(user.id));
+    setLoadingCategories(false);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    try {
-      const response = await fetch('/api/reminders', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...formData,
-          datetime: new Date(formData.datetime).toISOString(),
-          categoryId: formData.categoryId || undefined
-        }),
-      });
-
-      if (response.ok) {
-        await response.json();
-        toast.success('Reminder created successfully!');
-        router.push('/dashboard');
-      } else {
-        const error = await response.json();
-        toast.error(error.error || 'Error creating reminder');
-      }
-    } catch (error) {
-      console.error('Error creating reminder:', error);
-      toast.error('Error creating reminder');
-    } finally {
-      setLoading(false);
-    }
+    const user = db.getCurrentUser();
+    if (!user) { setLoading(false); return; }
+    db.createReminder(user.id, {
+      title: formData.title,
+      description: formData.description,
+      datetime: new Date(formData.datetime).toISOString(),
+      priority: formData.priority as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT',
+      isCompleted: false,
+      isRecurring: formData.isRecurring,
+      recurrence: formData.isRecurring ? formData.recurrence as 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY' | 'CUSTOM' : undefined,
+      categoryId: formData.categoryId,
+      location: formData.location,
+      notes: formData.notes,
+    });
+    toast.success('Reminder created successfully!');
+    router.push('/dashboard');
+    setLoading(false);
   };
 
   const handleChange = (field: string, value: string | boolean | number | undefined) => {
