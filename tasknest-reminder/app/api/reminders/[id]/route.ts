@@ -39,7 +39,7 @@ async function getUserEmail(request: NextRequest) {
 // GET /api/reminders/[id] - Get specific reminder
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const userEmail = await getUserEmail(request);
@@ -48,7 +48,8 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const reminderId = parseInt(params.id);
+    const { id } = await params;
+    const reminderId = parseInt(id);
     if (isNaN(reminderId)) {
       return NextResponse.json({ error: 'Invalid reminder ID' }, { status: 400 });
     }
@@ -87,7 +88,7 @@ export async function GET(
 // PUT /api/reminders/[id] - Update reminder
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const userEmail = await getUserEmail(request);
@@ -96,7 +97,8 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const reminderId = parseInt(params.id);
+    const { id } = await params;
+    const reminderId = parseInt(id);
     if (isNaN(reminderId)) {
       return NextResponse.json({ error: 'Invalid reminder ID' }, { status: 400 });
     }
@@ -154,7 +156,7 @@ export async function PUT(
 // DELETE /api/reminders/[id] - Delete reminder
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const userEmail = await getUserEmail(request);
@@ -163,7 +165,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const reminderId = parseInt(params.id);
+    const { id } = await params;
+    const reminderId = parseInt(id);
     if (isNaN(reminderId)) {
       return NextResponse.json({ error: 'Invalid reminder ID' }, { status: 400 });
     }
@@ -207,7 +210,7 @@ export async function DELETE(
 // PATCH /api/reminders/[id]/complete - Toggle completion status
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const userEmail = await getUserEmail(request);
@@ -216,7 +219,8 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const reminderId = parseInt(params.id);
+    const { id } = await params;
+    const reminderId = parseInt(id);
     if (isNaN(reminderId)) {
       return NextResponse.json({ error: 'Invalid reminder ID' }, { status: 400 });
     }
