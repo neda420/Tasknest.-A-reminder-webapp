@@ -1,0 +1,6 @@
+{
+  "buildCommand": "cd tasknest-reminder && npm run build",
+  "installCommand": "cd tasknest-reminder && npm install",
+  "outputDirectory": "tasknest-reminder/.next",
+  "framework": "nextjs"
+}

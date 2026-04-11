@@ -31,6 +31,34 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Prerequisites
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+You need a MySQL-compatible database accessible from the internet. Recommended providers that work well with Vercel's serverless environment:
+
+- **[PlanetScale](https://planetscale.com)** (MySQL-compatible, serverless-friendly)
+- **[Railway](https://railway.app)** (managed MySQL)
+- Any other remotely accessible MySQL instance
+
+### Steps
+
+1. **Push your database schema** (run once from your local machine after setting `DATABASE_URL` in `.env`):
+   ```bash
+   cd tasknest-reminder
+   npm run db:push
+   ```
+
+2. **Import the repository into Vercel**:
+   - Go to [vercel.com/new](https://vercel.com/new) and import this repository.
+   - Vercel will automatically detect the `vercel.json` at the repo root and use the correct build configuration.
+
+3. **Set environment variables** in the Vercel project dashboard under *Settings → Environment Variables*:
+
+   | Variable | Description |
+   |---|---|
+   | `DATABASE_URL` | MySQL connection string (e.g. `mysql://user:pass@host/db`) |
+
+4. **Deploy** — Vercel will run `prisma generate && next build` automatically.
+
+> **Note**: `prisma generate` is included in the build command so Prisma's TypeScript client is always generated fresh on each deployment.
+
+Check out the [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
