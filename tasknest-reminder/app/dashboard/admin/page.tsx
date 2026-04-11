@@ -39,7 +39,6 @@ export default function AdminPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [addUserData, setAddUserData] = useState({ name: "", email: "", password: "", nickname: "" });
   const [editUserData, setEditUserData] = useState({ id: 0, name: "", email: "", nickname: "" });
-  const [deletingUserId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [userReminders, setUserReminders] = useState<Reminder[]>([]);
@@ -48,7 +47,6 @@ export default function AdminPage() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordUser, setPasswordUser] = useState<User | null>(null);
   const [newPassword, setNewPassword] = useState("");
-  const [resettingPassword] = useState(false);
 
   // Stats
   const totalUsers = users.length;
@@ -282,8 +280,8 @@ export default function AdminPage() {
                       <td className="px-4 py-2 whitespace-nowrap">{user.lastLogin ? new Date(user.lastLogin).toLocaleString() : "-"}</td>
                       <td className="px-4 py-2 whitespace-nowrap flex gap-2">
                         <Button size="sm" variant="outline" onClick={() => openEditModal(user)}>Edit</Button>
-                        <Button size="sm" variant="destructive" onClick={() => handleDeleteUser(user.id)} disabled={deletingUserId === user.id}>
-                          {deletingUserId === user.id ? "Deleting..." : "Delete"}
+                        <Button size="sm" variant="destructive" onClick={() => handleDeleteUser(user.id)}>
+                          Delete
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => openRemindersModal(user)}>
                           Reminders
@@ -410,7 +408,7 @@ export default function AdminPage() {
                 </div>
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setShowPasswordModal(false)}>Cancel</Button>
-                  <Button type="submit" disabled={resettingPassword}>{resettingPassword ? "Resetting..." : "Reset"}</Button>
+                  <Button type="submit">Reset</Button>
                 </div>
               </form>
             </div>

@@ -131,8 +131,9 @@ export function getCurrentUser(): User | null {
 export function setAuthCookies(user: User): void {
   if (typeof document === 'undefined') return;
   const maxAge = 60 * 60 * 24 * 7;
-  document.cookie = `userEmail=${user.email}; max-age=${maxAge}; path=/; samesite=lax`;
-  document.cookie = `userId=${user.id}; max-age=${maxAge}; path=/; samesite=lax`;
+  const secure = typeof location !== 'undefined' && location.protocol === 'https:' ? '; secure' : '';
+  document.cookie = `userEmail=${user.email}; max-age=${maxAge}; path=/; samesite=lax${secure}`;
+  document.cookie = `userId=${user.id}; max-age=${maxAge}; path=/; samesite=lax${secure}`;
 }
 
 export function clearAuthCookies(): void {
