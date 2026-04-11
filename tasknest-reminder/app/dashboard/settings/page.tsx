@@ -156,7 +156,7 @@ export default function SettingsPage() {
     setSaving(false);
   };
 
-  const handlePasswordChange = () => {
+  const handlePasswordChange = async () => {
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       toast.error('New passwords do not match');
       return;
@@ -174,11 +174,13 @@ export default function SettingsPage() {
 
     const user = db.getCurrentUser();
     if (!user) return;
-    if (user.password !== passwordData.currentPassword) {
+    const hashedCurrent = await db.hashPassword(passwordData.currentPassword);
+    if (user.password !== hashedCurrent) {
       toast.error('Current password is incorrect');
       return;
     }
-    db.updateUser(user.id, { password: passwordData.newPassword });
+    const hashedNew = await db.hashPassword(passwordData.newPassword);
+    db.updateUser(user.id, { password: hashedNew });
     setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
     toast.success('Password changed successfully!');
   };

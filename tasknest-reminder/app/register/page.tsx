@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Bell, Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { getUserByEmail, createUser, setAuthCookies } from '@/lib/store';
+import { getUserByEmail, createUser, setAuthCookies, hashPassword } from '@/lib/store';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -38,7 +38,8 @@ export default function RegisterPage() {
       return;
     }
 
-    const user = createUser({ name: formData.name, email: formData.email, password: formData.password });
+    const hashed = await hashPassword(formData.password);
+    const user = createUser({ name: formData.name, email: formData.email, password: hashed });
     setAuthCookies(user);
     toast.success('Registration successful! Welcome to TaskNest!');
     router.push('/dashboard');

@@ -59,6 +59,15 @@ function save(key: string, value: unknown): void {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+/** Hash a password with SHA-256 via the Web Crypto API (browser-native). */
+export async function hashPassword(password: string): Promise<string> {
+  if (typeof window === 'undefined' || !window.crypto?.subtle) return password;
+  const buf = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(password));
+  return Array.from(new Uint8Array(buf))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 function nextId(): number {
   if (typeof window === 'undefined') return 0;
   const count = (safe<number>(COUNTER_KEY, 0)) + 1;

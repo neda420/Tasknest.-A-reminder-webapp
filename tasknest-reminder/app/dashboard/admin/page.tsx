@@ -97,13 +97,14 @@ export default function AdminPage() {
   const handleAddChange = (field: string, value: string) => {
     setAddUserData((prev) => ({ ...prev, [field]: value }));
   };
-  const handleAddSubmit = (e: React.FormEvent) => {
+  const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (db.getUserByEmail(addUserData.email)) {
       toast.error("Email already exists");
       return;
     }
-    db.createUser({ name: addUserData.name, email: addUserData.email, password: addUserData.password });
+    const hashed = await db.hashPassword(addUserData.password);
+    db.createUser({ name: addUserData.name, email: addUserData.email, password: hashed });
     toast.success("User added");
     setShowAddModal(false);
     fetchUsers();
@@ -139,10 +140,11 @@ export default function AdminPage() {
     setNewPassword("");
     setShowPasswordModal(true);
   };
-  const handlePasswordReset = (e: React.FormEvent) => {
+  const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!passwordUser) return;
-    db.updateUser(passwordUser.id, { password: newPassword });
+    const hashed = await db.hashPassword(newPassword);
+    db.updateUser(passwordUser.id, { password: hashed });
     toast.success("Password reset successfully");
     setShowPasswordModal(false);
     setNewPassword("");

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Bell, Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { getUserByEmail, setAuthCookies, updateUser } from '@/lib/store';
+import { getUserByEmail, setAuthCookies, updateUser, hashPassword } from '@/lib/store';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -21,8 +21,9 @@ export default function LoginPage() {
     setLoading(true);
 
     const user = getUserByEmail(formData.email);
+    const hashed = await hashPassword(formData.password);
 
-    if (!user || user.password !== formData.password) {
+    if (!user || user.password !== hashed) {
       toast.error('Invalid email or password');
       setLoading(false);
       return;
