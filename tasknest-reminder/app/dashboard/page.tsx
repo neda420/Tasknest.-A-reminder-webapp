@@ -697,7 +697,7 @@ export default function DashboardPage() {
                       </span>
                       
                       <div className="flex items-center space-x-1">
-                        <Link href={`/dashboard/reminder/edit/${reminder.id}`}>
+                        <Link href={`/dashboard/reminder/edit?id=${reminder.id}`}>
                           <Button variant="ghost" size="sm">
                             Edit
                           </Button>
