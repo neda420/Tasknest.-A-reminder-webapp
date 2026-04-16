@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
@@ -38,11 +38,31 @@ interface Category {
   icon?: string;
 }
 
+function LoadingState() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+        <p className="mt-4 text-gray-600">Loading reminder...</p>
+      </div>
+    </div>
+  );
+}
+
 export default function EditReminderPage() {
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <EditReminderContent />
+    </Suspense>
+  );
+}
+
+function EditReminderContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const reminderIdParam = searchParams.get('id');
-  const reminderId = reminderIdParam ? Number.parseInt(reminderIdParam, 10) : Number.NaN;
+  const parsedReminderId = reminderIdParam ? Number.parseInt(reminderIdParam, 10) : null;
+  const reminderId = parsedReminderId !== null && Number.isFinite(parsedReminderId) ? parsedReminderId : null;
   
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -68,21 +88,21 @@ export default function EditReminderPage() {
   useEffect(() => {
     if (!mounted) return;
 
-    if (!Number.isFinite(reminderId)) {
+    if (reminderId === null) {
       toast.error('Reminder not found');
       router.push('/dashboard');
       setLoading(false);
       return;
     }
 
-    loadReminderData();
+    loadReminderData(reminderId);
     loadCategories();
-  }, [mounted, reminderId]);
+  }, [mounted, reminderId, router]);
 
-  const loadReminderData = () => {
+  const loadReminderData = (id: number) => {
     const user = db.getCurrentUser();
     if (!user) return;
-    const r = db.getReminderById(reminderId, user.id);
+    const r = db.getReminderById(id, user.id);
     if (r) {
       setReminder(r);
     } else {
@@ -100,6 +120,7 @@ export default function EditReminderPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (reminderId === null) return;
     setSaving(true);
 
     const user = db.getCurrentUser();
@@ -119,6 +140,7 @@ export default function EditReminderPage() {
 
   const handleDelete = () => {
     if (!confirm('Are you sure you want to delete this reminder?')) return;
+    if (reminderId === null) return;
     const user = db.getCurrentUser();
     if (!user) return;
     db.deleteReminder(reminderId, user.id);
@@ -127,14 +149,7 @@ export default function EditReminderPage() {
   };
 
   if (!mounted || loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading reminder...</p>
-        </div>
-      </div>
-    );
+    return <LoadingState />;
   }
 
   return (
