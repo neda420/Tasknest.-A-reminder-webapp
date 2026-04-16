@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
 import { 
@@ -40,8 +40,9 @@ interface Category {
 
 export default function EditReminderPage() {
   const router = useRouter();
-  const params = useParams();
-  const reminderId = params.id as string;
+  const searchParams = useSearchParams();
+  const reminderIdParam = searchParams.get('id');
+  const reminderId = reminderIdParam ? Number.parseInt(reminderIdParam, 10) : Number.NaN;
   
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -65,16 +66,23 @@ export default function EditReminderPage() {
   }, []);
 
   useEffect(() => {
-    if (mounted && reminderId) {
-      loadReminderData();
-      loadCategories();
+    if (!mounted) return;
+
+    if (!Number.isFinite(reminderId)) {
+      toast.error('Reminder not found');
+      router.push('/dashboard');
+      setLoading(false);
+      return;
     }
+
+    loadReminderData();
+    loadCategories();
   }, [mounted, reminderId]);
 
   const loadReminderData = () => {
     const user = db.getCurrentUser();
     if (!user) return;
-    const r = db.getReminderById(parseInt(reminderId), user.id);
+    const r = db.getReminderById(reminderId, user.id);
     if (r) {
       setReminder(r);
     } else {
@@ -96,7 +104,7 @@ export default function EditReminderPage() {
 
     const user = db.getCurrentUser();
     if (!user) { setSaving(false); return; }
-    const updated = db.updateReminder(parseInt(reminderId), user.id, {
+    const updated = db.updateReminder(reminderId, user.id, {
       ...reminder,
       datetime: new Date(reminder.datetime).toISOString(),
     });
@@ -113,7 +121,7 @@ export default function EditReminderPage() {
     if (!confirm('Are you sure you want to delete this reminder?')) return;
     const user = db.getCurrentUser();
     if (!user) return;
-    db.deleteReminder(parseInt(reminderId), user.id);
+    db.deleteReminder(reminderId, user.id);
     toast.success('Reminder deleted successfully!');
     router.push('/dashboard');
   };
