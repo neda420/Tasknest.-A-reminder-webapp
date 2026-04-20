@@ -1,6 +1,13 @@
 # TaskNest — Reminder Web App
 
 TaskNest is a Next.js reminder and task management web app with user registration/login, reminder tracking, categories, priorities, recurring schedules, analytics, and an admin dashboard.
+<img width="1919" height="1033" alt="image" src="https://github.com/user-attachments/assets/6f301f5f-f2f1-4eb5-a7e4-dd6a25921923" />
+<img width="1919" height="1032" alt="image" src="https://github.com/user-attachments/assets/29eb7588-516f-429c-b65a-7e662f5b57e1" />
+<img width="1919" height="1026" alt="image" src="https://github.com/user-attachments/assets/c22d000b-10a5-4ac4-b4d2-6caa30c9aaf3" />
+<img width="1919" height="1033" alt="image" src="https://github.com/user-attachments/assets/dae29f40-7733-46d0-aa6c-d163242e2789" />
+<img width="1919" height="979" alt="image" src="https://github.com/user-attachments/assets/60e70e6d-1b28-4831-8226-e98b2b0b60bf" />
+<img width="1919" height="976" alt="image" src="https://github.com/user-attachments/assets/6dc3d7c1-0974-461e-aece-e1f0534293c7" />
+![Uploading image.png…]()
 
 ## Repository Layout
 
