@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Bell, Eye, EyeOff, Mail, Lock } from 'lucide-react';
+import { Bell, Eye, EyeOff, Mail, Lock, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getUserByEmail, setAuthCookies, updateUser, hashPassword } from '@/lib/store';
 
@@ -20,34 +20,30 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
 
-    const user = getUserByEmail(formData.email);
-    const hashed = await hashPassword(formData.password);
+    try {
+      const user = getUserByEmail(formData.email);
+      const hashed = await hashPassword(formData.password);
 
-    if (!user || user.password !== hashed) {
-      toast.error('Invalid email or password');
-      setLoading(false);
-      return;
-    }
+      if (!user || user.password !== hashed) {
+        toast.error('Invalid email or password');
+        return;
+      }
 
-    if (!user.isActive) {
-      toast.error('Your account is disabled');
-      setLoading(false);
-      return;
-    }
+      if (!user.isActive) {
+        toast.error('Your account is disabled');
+        return;
+      }
 
-    updateUser(user.id, { lastLogin: new Date().toISOString() });
-    setAuthCookies(user);
-    toast.success('Login successful!');
+      updateUser(user.id, { lastLogin: new Date().toISOString() });
+      setAuthCookies(user);
+      toast.success('Login successful!');
 
-    setTimeout(() => {
       router.push(user.role === 'ADMIN' ? '/dashboard/admin' : '/dashboard');
-    }, 100);
-
-    setLoading(false);
-  };
-
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    } catch (error) {
+      toast.error('An unexpected error occurred');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -68,14 +64,14 @@ export default function LoginPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">Email Address</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     type="email"
                     value={formData.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     placeholder="Enter your email"
                     required
                     className="pl-10"
@@ -83,14 +79,14 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">Password</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     type={showPassword ? 'text' : 'password'}
                     value={formData.password}
-                    onChange={(e) => handleInputChange('password', e.target.value)}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     placeholder="Enter your password"
                     required
                     className="pl-10 pr-10"
@@ -98,7 +94,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -110,8 +106,14 @@ export default function LoginPage() {
                 disabled={loading || !formData.email || !formData.password}
                 className="w-full"
               >
-                {loading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />}
-                {loading ? 'Signing in...' : 'Sign In'}
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  'Sign In'
+                )}
               </Button>
             </form>
 
