@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,9 @@ import { getUserByEmail, setAuthCookies, updateUser, hashPassword } from '@/lib/
 
 export default function LoginPage() {
   const router = useRouter();
+  const emailId = useId();
+  const passwordId = useId();
+  
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -21,16 +24,20 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const user = getUserByEmail(formData.email);
-      const hashed = await hashPassword(formData.password);
+      // Small artificial delay to unify response timing
+      const [user, hashed] = await Promise.all([
+        getUserByEmail(formData.email),
+        hashPassword(formData.password),
+        new Promise(resolve => setTimeout(resolve, 400))
+      ]);
 
       if (!user || user.password !== hashed) {
-        toast.error('Invalid email or password');
+        toast.error('Invalid credentials provided');
         return;
       }
 
       if (!user.isActive) {
-        toast.error('Your account is disabled');
+        toast.error('Account restricted. Please contact support.');
         return;
       }
 
@@ -38,63 +45,74 @@ export default function LoginPage() {
       setAuthCookies(user);
       toast.success('Login successful!');
 
-      router.push(user.role === 'ADMIN' ? '/dashboard/admin' : '/dashboard');
+      // Smooth transition to dashboard
+      const targetPath = user.role === 'ADMIN' ? '/dashboard/admin' : '/dashboard';
+      router.replace(targetPath);
     } catch (error) {
-      toast.error('An unexpected error occurred');
+      toast.error('Authentication service unavailable');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-4">
-            <Bell className="h-12 w-12 text-blue-600" />
+          <div className="inline-flex items-center justify-center p-3 bg-blue-600 rounded-2xl shadow-lg shadow-blue-200 mb-4">
+            <Bell className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h1>
-          <p className="text-gray-600">Sign in to your TaskNest account</p>
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Welcome Back</h1>
+          <p className="text-slate-500 mt-2">Enter your TaskNest credentials</p>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Sign In</CardTitle>
-            <CardDescription>Enter your credentials to access your reminders</CardDescription>
+        <Card className="border-none shadow-xl ring-1 ring-slate-200">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl">Sign In</CardTitle>
+            <CardDescription>Stay organized with your personal reminders</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium leading-none">Email Address</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="space-y-1.5">
+                <label htmlFor={emailId} className="text-sm font-semibold text-slate-700">
+                  Email Address
+                </label>
+                <div className="relative group">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                   <Input
+                    id={emailId}
                     type="email"
+                    autoComplete="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="Enter your email"
+                    placeholder="name@example.com"
                     required
-                    className="pl-10"
+                    className="pl-10 h-11 border-slate-200 focus:border-blue-500"
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium leading-none">Password</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <div className="space-y-1.5">
+                <label htmlFor={passwordId} className="text-sm font-semibold text-slate-700">
+                  Password
+                </label>
+                <div className="relative group">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                   <Input
+                    id={passwordId}
                     type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder="Enter your password"
+                    placeholder="••••••••"
                     required
-                    className="pl-10 pr-10"
+                    className="pl-10 pr-10 h-11 border-slate-200 focus:border-blue-500"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -104,24 +122,21 @@ export default function LoginPage() {
               <Button
                 type="submit"
                 disabled={loading || !formData.email || !formData.password}
-                className="w-full"
+                className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-sm font-bold transition-all shadow-md shadow-blue-100"
               >
                 {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signing in...
-                  </>
+                  <Loader2 className="h-5 w-5 animate-spin" />
                 ) : (
-                  'Sign In'
+                  'Continue to Dashboard'
                 )}
               </Button>
             </form>
 
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
-                Don&apos;t have an account?{' '}
-                <Link href="/register" className="text-blue-600 hover:text-blue-700 font-medium">
-                  Sign up here
+            <div className="mt-8 pt-6 border-t border-slate-100 text-center">
+              <p className="text-sm text-slate-500">
+                New to the platform?{' '}
+                <Link href="/register" className="text-blue-600 hover:underline font-semibold">
+                  Create an account
                 </Link>
               </p>
             </div>
