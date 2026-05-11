@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,22 +42,49 @@ export default function AnalyticsPage() {
   });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadAnalytics();
-  }, [router]);
-
-  const loadAnalytics = () => {
-    const user = db.getCurrentUser();
-    if (!user) {
-      router.push('/login');
-      return;
+  const calculateWeeklyTrend = useCallback((reminders: Reminder[]): Array<{ week: string; completed: number; total: number }> => {
+    const now = new Date();
+    const weeks = [];
+    
+    // Generate last 4 weeks
+    for (let i = 3; i >= 0; i--) {
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - (now.getDay() + 7 * i));
+      weekStart.setHours(0, 0, 0, 0);
+      
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+      
+      const weekReminders = reminders.filter(r => {
+        const reminderDate = new Date(r.datetime);
+        return reminderDate >= weekStart && reminderDate <= weekEnd;
+      });
+      
+      const completed = weekReminders.filter(r => r.isCompleted).length;
+      const total = weekReminders.length;
+      
+      weeks.push({
+        week: `Week ${4 - i}`,
+        completed,
+        total
+      });
     }
-    const reminders = db.getReminders(user.id);
-    calculateAnalytics(reminders);
-    setLoading(false);
-  };
+    
+    return weeks;
+  }, []);
 
-  const calculateAnalytics = (reminders: Reminder[]) => {
+  const calculateAverageCompletionTime = useCallback((reminders: Reminder[]): number => {
+    // This would need completion timestamps in the database
+    // For now, return a mock value based on completion rate
+    const completedCount = reminders.filter(r => r.isCompleted).length;
+    if (completedCount === 0) return 0;
+    
+    // Mock calculation: assume completed tasks took 1-3 days on average
+    return Math.round((Math.random() * 2 + 1) * 10) / 10; // Random between 1.0 and 3.0
+  }, []);
+
+  const calculateAnalytics = useCallback((reminders: Reminder[]) => {
     const now = new Date();
     const totalReminders = reminders.length;
     const completedReminders = reminders.filter(r => r.isCompleted).length;
@@ -88,49 +115,22 @@ export default function AnalyticsPage() {
       overdueCount,
       upcomingCount
     });
-  };
+  }, [calculateAverageCompletionTime, calculateWeeklyTrend]);
 
-  const calculateWeeklyTrend = (reminders: Reminder[]): Array<{ week: string; completed: number; total: number }> => {
-    const now = new Date();
-    const weeks = [];
-    
-    // Generate last 4 weeks
-    for (let i = 3; i >= 0; i--) {
-      const weekStart = new Date(now);
-      weekStart.setDate(now.getDate() - (now.getDay() + 7 * i));
-      weekStart.setHours(0, 0, 0, 0);
-      
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
-      weekEnd.setHours(23, 59, 59, 999);
-      
-      const weekReminders = reminders.filter(r => {
-        const reminderDate = new Date(r.datetime);
-        return reminderDate >= weekStart && reminderDate <= weekEnd;
-      });
-      
-      const completed = weekReminders.filter(r => r.isCompleted).length;
-      const total = weekReminders.length;
-      
-      weeks.push({
-        week: `Week ${4 - i}`,
-        completed,
-        total
-      });
+  const loadAnalytics = useCallback(() => {
+    const user = db.getCurrentUser();
+    if (!user) {
+      router.push('/login');
+      return;
     }
-    
-    return weeks;
-  };
+    const reminders = db.getReminders(user.id);
+    calculateAnalytics(reminders);
+    setLoading(false);
+  }, [calculateAnalytics, router]);
 
-  const calculateAverageCompletionTime = (reminders: Reminder[]): number => {
-    // This would need completion timestamps in the database
-    // For now, return a mock value based on completion rate
-    const completedCount = reminders.filter(r => r.isCompleted).length;
-    if (completedCount === 0) return 0;
-    
-    // Mock calculation: assume completed tasks took 1-3 days on average
-    return Math.round((Math.random() * 2 + 1) * 10) / 10; // Random between 1.0 and 3.0
-  };
+  useEffect(() => {
+    loadAnalytics();
+  }, [loadAnalytics]);
 
   if (loading) {
     return (

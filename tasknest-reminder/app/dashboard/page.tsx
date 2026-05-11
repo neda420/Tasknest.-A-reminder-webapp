@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -81,6 +81,37 @@ export default function DashboardPage() {
     setMounted(true);
   }, []);
 
+  const loadDashboardData = useCallback(() => {
+    const user = db.getCurrentUser();
+    if (!user) return;
+
+    setUserProfile({
+      name: user.name,
+      nickname: user.nickname || '',
+      imageUrl: user.avatar || '',
+    });
+
+    const reminders = db.getReminders(user.id);
+    setReminders(reminders);
+    calculateStats(reminders);
+
+    const categories = db.getCategories(user.id).map(c => ({
+      ...c,
+      reminderCount: 0,
+    }));
+    setCategories(categories);
+  }, []);
+
+  const refreshProfileData = useCallback(() => {
+    const user = db.getCurrentUser();
+    if (!user) return;
+    setUserProfile({
+      name: user.name,
+      nickname: user.nickname || '',
+      imageUrl: user.avatar || '',
+    });
+  }, []);
+
   useEffect(() => {
     if (!mounted) return;
 
@@ -96,23 +127,23 @@ export default function DashboardPage() {
     console.log('Dashboard: Checking for userEmail cookie:', email);
     console.log('Dashboard: All cookies:', document.cookie);
     
-          if (email) {
-        console.log('Dashboard: Found email, setting user and loading data');
-        setUserEmail(email);
-        loadDashboardData();
-        
-        // Check if profile was recently updated
-        const profileUpdated = localStorage.getItem('profileUpdated');
-        if (profileUpdated) {
-          console.log('Dashboard: Profile was recently updated, refreshing profile data');
-          refreshProfileData();
-          localStorage.removeItem('profileUpdated'); // Clear the flag
-        }
-      } else {
-        console.log('Dashboard: No email found, redirecting to login');
-        router.push('/login');
+    if (email) {
+      console.log('Dashboard: Found email, setting user and loading data');
+      setUserEmail(email);
+      loadDashboardData();
+      
+      // Check if profile was recently updated
+      const profileUpdated = localStorage.getItem('profileUpdated');
+      if (profileUpdated) {
+        console.log('Dashboard: Profile was recently updated, refreshing profile data');
+        refreshProfileData();
+        localStorage.removeItem('profileUpdated'); // Clear the flag
       }
-  }, [router, mounted]);
+    } else {
+      console.log('Dashboard: No email found, redirecting to login');
+      router.push('/login');
+    }
+  }, [loadDashboardData, mounted, refreshProfileData, router]);
 
   // Refresh data when component becomes visible (e.g., returning from settings)
   useEffect(() => {
@@ -136,28 +167,7 @@ export default function DashboardPage() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, [userEmail]);
-
-  const loadDashboardData = () => {
-    const user = db.getCurrentUser();
-    if (!user) return;
-
-    setUserProfile({
-      name: user.name,
-      nickname: user.nickname || '',
-      imageUrl: user.avatar || '',
-    });
-
-    const reminders = db.getReminders(user.id);
-    setReminders(reminders);
-    calculateStats(reminders);
-
-    const categories = db.getCategories(user.id).map(c => ({
-      ...c,
-      reminderCount: 0,
-    }));
-    setCategories(categories);
-  };
+  }, [refreshProfileData, userEmail]);
 
   const handleLogout = () => {
     db.clearAuthCookies();
@@ -233,17 +243,8 @@ export default function DashboardPage() {
     const user = db.getCurrentUser();
     if (!user) return;
     db.createCategory(user.id, { name: categoryName.trim(), color: '#3B82F6' });
+    loadDashboardData();
     toast.success('Quick category added!');
-  };
-
-  const refreshProfileData = () => {
-    const user = db.getCurrentUser();
-    if (!user) return;
-    setUserProfile({
-      name: user.name,
-      nickname: user.nickname || '',
-      imageUrl: user.avatar || '',
-    });
   };
 
   const filteredReminders = reminders.filter(reminder => {

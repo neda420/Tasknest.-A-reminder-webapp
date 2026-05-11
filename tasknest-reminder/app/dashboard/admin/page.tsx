@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -58,12 +58,7 @@ export default function AdminPage() {
   );
   const recentUsers = users.slice(0, 5);
 
-  useEffect(() => {
-    // Let the API enforce admin access; redirect on 403
-    fetchUsers();
-  }, []);
-
-  const fetchUsers = () => {
+  const fetchUsers = useCallback(() => {
     const currentUser = db.getCurrentUser();
     if (!currentUser || currentUser.role !== 'ADMIN') {
       router.push('/dashboard');
@@ -71,7 +66,12 @@ export default function AdminPage() {
     }
     setUsers(db.getUsers());
     setLoading(false);
-  };
+  }, [router]);
+
+  useEffect(() => {
+    // Let the API enforce admin access; redirect on 403
+    fetchUsers();
+  }, [fetchUsers]);
 
   // Edit user
   const openEditModal = (user: User) => {

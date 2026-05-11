@@ -48,7 +48,7 @@ export default function LoginPage() {
       // Smooth transition to dashboard
       const targetPath = user.role === 'ADMIN' ? '/dashboard/admin' : '/dashboard';
       router.replace(targetPath);
-    } catch (error) {
+    } catch {
       toast.error('Authentication service unavailable');
     } finally {
       setLoading(false);
