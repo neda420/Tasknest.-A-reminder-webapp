@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,11 +42,7 @@ export default function AnalyticsPage() {
   });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadAnalytics();
-  }, [router]);
-
-  const loadAnalytics = () => {
+  const loadAnalytics = useCallback(() => {
     const user = db.getCurrentUser();
     if (!user) {
       router.push('/login');
@@ -55,7 +51,11 @@ export default function AnalyticsPage() {
     const reminders = db.getReminders(user.id);
     calculateAnalytics(reminders);
     setLoading(false);
-  };
+  }, [router]);
+
+  useEffect(() => {
+    loadAnalytics();
+  }, [loadAnalytics]);
 
   const calculateAnalytics = (reminders: Reminder[]) => {
     const now = new Date();

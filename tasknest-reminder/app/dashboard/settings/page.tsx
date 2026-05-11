@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import Image from 'next/image';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
@@ -69,25 +70,7 @@ export default function SettingsPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
 
-  useEffect(() => {
-    setMounted(true);
-    const user = db.getCurrentUser();
-    if (user) {
-      setUserEmail(user.email);
-      loadUserProfile();
-    } else {
-      setLoading(false);
-    }
-  }, []);
-
-  // Refresh profile data when component mounts or userEmail changes
-  useEffect(() => {
-    if (userEmail && mounted) {
-      loadUserProfile();
-    }
-  }, [userEmail, mounted]);
-
-  const loadAccountInfo = () => {
+  const loadAccountInfo = useCallback(() => {
     const user = db.getCurrentUser();
     if (!user) return;
     setAccountInfo({
@@ -97,9 +80,9 @@ export default function SettingsPage() {
         : 'N/A',
       status: user.isActive ? 'Active' : 'Inactive',
     });
-  };
+  }, []);
 
-  const loadUserProfile = () => {
+  const loadUserProfile = useCallback(() => {
     const user = db.getCurrentUser();
     if (!user) { setLoading(false); return; }
     setProfile({
@@ -112,7 +95,24 @@ export default function SettingsPage() {
     setImagePreview(user.avatar || '');
     loadAccountInfo();
     setLoading(false);
-  };
+  }, [loadAccountInfo]);
+
+  useEffect(() => {
+    setMounted(true);
+    const user = db.getCurrentUser();
+    if (user) {
+      setUserEmail(user.email);
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  // Refresh profile data when component mounts or userEmail changes
+  useEffect(() => {
+    if (userEmail && mounted) {
+      loadUserProfile();
+    }
+  }, [loadUserProfile, userEmail, mounted]);
 
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -255,9 +255,12 @@ export default function SettingsPage() {
                   <div className="relative">
                     <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
                       {imagePreview ? (
-                        <img 
-                          src={imagePreview} 
-                          alt="Profile" 
+                        <Image
+                          src={imagePreview}
+                          alt="Profile"
+                          width={96}
+                          height={96}
+                          unoptimized
                           className="w-full h-full object-cover"
                         />
                       ) : (

@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
@@ -85,6 +85,25 @@ function EditReminderContent() {
     setMounted(true);
   }, []);
 
+  const loadReminderData = useCallback((id: number) => {
+    const user = db.getCurrentUser();
+    if (!user) return;
+    const r = db.getReminderById(id, user.id);
+    if (r) {
+      setReminder(r);
+    } else {
+      toast.error('Reminder not found');
+      router.push('/dashboard');
+    }
+    setLoading(false);
+  }, [router]);
+
+  const loadCategories = useCallback(() => {
+    const user = db.getCurrentUser();
+    if (!user) return;
+    setCategories(db.getCategories(user.id));
+  }, []);
+
   useEffect(() => {
     if (!mounted) return;
 
@@ -97,26 +116,7 @@ function EditReminderContent() {
 
     loadReminderData(reminderId);
     loadCategories();
-  }, [mounted, reminderId, router]);
-
-  const loadReminderData = (id: number) => {
-    const user = db.getCurrentUser();
-    if (!user) return;
-    const r = db.getReminderById(id, user.id);
-    if (r) {
-      setReminder(r);
-    } else {
-      toast.error('Reminder not found');
-      router.push('/dashboard');
-    }
-    setLoading(false);
-  };
-
-  const loadCategories = () => {
-    const user = db.getCurrentUser();
-    if (!user) return;
-    setCategories(db.getCategories(user.id));
-  };
+  }, [loadCategories, loadReminderData, mounted, reminderId, router]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
