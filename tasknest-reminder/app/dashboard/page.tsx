@@ -243,6 +243,7 @@ export default function DashboardPage() {
     const user = db.getCurrentUser();
     if (!user) return;
     db.createCategory(user.id, { name: categoryName.trim(), color: '#3B82F6' });
+    loadDashboardData();
     toast.success('Quick category added!');
   };
 
