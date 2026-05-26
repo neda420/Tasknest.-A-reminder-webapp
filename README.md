@@ -53,7 +53,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+Open `http://localhost:3000'
 
 ## Available Scripts
 
