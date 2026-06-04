@@ -47,13 +47,7 @@ cd tasknest-reminder
 npm ci
 ```
 
-### Run Locally
 
-```bash
-npm run dev
-```
-
-Open `http://localhost:3000'
 
 ## Available Scripts
 
