@@ -3,6 +3,7 @@ import { Bell, CheckCircle, Clock, Calendar, BarChart3, Shield } from 'lucide-re
 
 export default function HomePage() {
   return (
+    
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
       <header className="container mx-auto px-6 py-6 flex items-center justify-between">
